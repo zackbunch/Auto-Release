@@ -12,11 +12,14 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println("Starting SYAC Image Build...")
+	log.Printf("Loading environment variables...")
 
 	cfg, err := docker.LoadConfig()
 	if err != nil {
 		log.Fatalf("Environment Configuration error: %v", err)
 	}
-	log.Printf("Target image: %s", cfg.TargetImage("0.0.1"))
+	log.Println("Environment variables loaded successfully.")
+
+	cfg.PrintSummary()
 
 }
