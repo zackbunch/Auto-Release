@@ -7,29 +7,39 @@ import (
 )
 
 type Config struct {
-	User            string
-	Password        string
-	Registry        string
-	Image           string
-	Project         string
-	Ref             string
-	Dockerfile      string
-	ExtraBuildArgs  []string
-	ApplicationName string
+	User              string
+	Password          string
+	Registry          string
+	RegistryImagePath string
+	Project           string
+	Ref               string
+	Dockerfile        string
+	ExtraBuildArgs    []string
+	ApplicationName   string
+	OpenShiftEnv      string
 }
 
 // LoadConfig populates the Config from environment variables and validates required fields
 func LoadConfig() (*Config, error) {
+	ref := os.Getenv("CI_COMMIT_REF_NAME")
+	openShiftEnv := deriveOpenShiftEnv(ref)
+
+	dockerfile := os.Getenv("SYAC_DOCKERFILE")
+	if dockerfile == "" {
+		dockerfile = "Dockerfile"
+	}
+
 	cfg := &Config{
-		User:            os.Getenv("CI_REGISTRY_USER"),
-		Password:        os.Getenv("CI_REGISTRY_PASSWORD"),
-		Registry:        os.Getenv("CI_REGISTRY"),
-		Image:           os.Getenv("CI_REGISTRY_IMAGE"),
-		Project:         os.Getenv("CI_PROJECT_PATH"),
-		Ref:             os.Getenv("CI_COMMIT_REF_NAME"),
-		Dockerfile:      os.Getenv("SYAC_DOCKERFILE"),
-		ExtraBuildArgs:  parseArgs(os.Getenv("SYAC_BUILD_EXTRA_ARGS")),
-		ApplicationName: os.Getenv("SYAC_APPLICATION_NAME"),
+		User:              os.Getenv("CI_REGISTRY_USER"),
+		Password:          os.Getenv("CI_REGISTRY_PASSWORD"),
+		Registry:          os.Getenv("CI_REGISTRY"),
+		RegistryImagePath: os.Getenv("CI_REGISTRY_IMAGE"),
+		Project:           os.Getenv("CI_PROJECT_PATH"),
+		Ref:               ref,
+		OpenShiftEnv:      openShiftEnv,
+		Dockerfile:        dockerfile,
+		ExtraBuildArgs:    parseArgs(os.Getenv("SYAC_BUILD_EXTRA_ARGS")),
+		ApplicationName:   os.Getenv("SYAC_APPLICATION_NAME"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -38,7 +48,7 @@ func LoadConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// internal parseArgs splits strings
+// parseArgs splits space-separated args into a slice
 func parseArgs(raw string) []string {
 	return strings.Fields(raw)
 }
@@ -56,11 +66,8 @@ func (c *Config) Validate() error {
 	if c.Registry == "" {
 		missing = append(missing, "CI_REGISTRY")
 	}
-	if c.Image == "" {
+	if c.RegistryImagePath == "" {
 		missing = append(missing, "CI_REGISTRY_IMAGE")
-	}
-	if c.Dockerfile == "" {
-		missing = append(missing, "SYAC_DOCKERFILE")
 	}
 
 	if len(missing) > 0 {
@@ -69,11 +76,36 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// ImageName returns the ApplicationName override if set else defaults to CI_PROJECT_NAME
+// ImageName returns the ApplicationName override if set, else defaults to the project name in CI_REGISTRY_IMAGE
 func (c *Config) ImageName() string {
 	if c.ApplicationName != "" {
 		return c.ApplicationName
 	}
-	parts := strings.Split(c.Image, "/")
-	return parts[len(parts)-1] // fallback to last part of CI_REGISTRY_IMAGE (usually the project name)
+	parts := strings.Split(c.RegistryImagePath, "/")
+	return parts[len(parts)-1] // fallback to last segment of CI_REGISTRY_IMAGE
+}
+
+// deriveOpenShiftEnv maps the Git branch/ref to the corresponding OpenShift environment
+func deriveOpenShiftEnv(ref string) string {
+	switch ref {
+	case "main", "master":
+		return "prod"
+	case "test":
+		return "test"
+	case "int":
+		return "int"
+	default:
+		return "dev"
+	}
+}
+
+// TargetImage returns the full image path with OpenShift environment and tag
+func (c *Config) TargetImage(tag string) string {
+	path := strings.TrimSuffix(c.RegistryImagePath, "/")
+	return fmt.Sprintf("%s/%s/%s:%s",
+		path,
+		c.OpenShiftEnv,
+		c.ImageName(),
+		tag,
+	)
 }

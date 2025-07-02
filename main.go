@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"syac/internal/docker"
 
@@ -18,6 +17,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Environment Configuration error: %v", err)
 	}
-	fmt.Println(cfg.Dockerfile)
+	log.Printf("Target image: %s", cfg.TargetImage("0.0.1"))
 
 }
