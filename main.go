@@ -33,4 +33,11 @@ func main() {
 	} else {
 		log.Println("Skipping image push (dev branch and SYAC_FORCE_PUSH not set)")
 	}
+
+	if cfg.EmitMetadata {
+		if err := docker.WriteMetadata(cfg); err != nil {
+			log.Fatalf("Failed to emit metadata: %v", err)
+		}
+		log.Println("Metadata written to syac_output.json")
+	}
 }
