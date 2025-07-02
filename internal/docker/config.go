@@ -13,21 +13,31 @@ type Config struct {
 	RegistryImagePath string   // Full image path with group/subgroup (from CI_REGISTRY_IMAGE)
 	Project           string   // GitLab project path (e.g. devops/syac/myapp)
 	Ref               string   // Git branch/ref name
+	CommitSHA         string   // CI commit hash, used for tagging dev builds
 	Dockerfile        string   // Dockerfile path, defaulting to "Dockerfile"
 	ExtraBuildArgs    []string // Optional space-separated build args
 	ApplicationName   string   // Optional image name override
 	OpenShiftEnv      string   // Derived OpenShift environment (e.g. dev, test, prod)
-	ForcePush         bool     // Whether to force push even in dev
+	ForcePush         bool     // Force image push even for dev builds
+	Tag               string   // Final derived tag (commit SHA for dev, semantic version otherwise)
 }
 
 // LoadConfig populates the Config from environment variables and validates required fields
 func LoadConfig() (*Config, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
+	commitSHA := os.Getenv("CI_COMMIT_SHA")
 	openShiftEnv := deriveOpenShiftEnv(ref)
 
 	dockerfile := os.Getenv("SYAC_DOCKERFILE")
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
+	}
+
+	var tag string
+	if openShiftEnv == "dev" {
+		tag = commitSHA
+	} else {
+		tag = "0.0.1" // TODO: replace with dynamic versioning logic
 	}
 
 	cfg := &Config{
@@ -37,11 +47,13 @@ func LoadConfig() (*Config, error) {
 		RegistryImagePath: os.Getenv("CI_REGISTRY_IMAGE"),
 		Project:           os.Getenv("CI_PROJECT_PATH"),
 		Ref:               ref,
+		CommitSHA:         commitSHA,
 		OpenShiftEnv:      openShiftEnv,
 		Dockerfile:        dockerfile,
 		ExtraBuildArgs:    parseArgs(os.Getenv("SYAC_BUILD_EXTRA_ARGS")),
 		ApplicationName:   os.Getenv("SYAC_APPLICATION_NAME"),
 		ForcePush:         os.Getenv("SYAC_FORCE_PUSH") == "true",
+		Tag:               tag,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -93,22 +105,15 @@ func (c *Config) TargetImage(tag string) string {
 	)
 }
 
-// ShouldPush returns true if the image should be pushed to the registry
-func (c *Config) ShouldPush() bool {
-	return c.OpenShiftEnv != "dev" || c.ForcePush
-}
-
 // deriveOpenShiftEnv maps the Git branch/ref to the corresponding OpenShift environment
 func deriveOpenShiftEnv(ref string) string {
-	switch {
-	case ref == "main" || ref == "master":
+	switch ref {
+	case "main", "master":
 		return "prod"
-	case ref == "test":
+	case "test":
 		return "test"
-	case ref == "int":
+	case "int":
 		return "int"
-	case strings.HasPrefix(ref, "release/"):
-		return "stage"
 	default:
 		return "dev"
 	}
@@ -119,16 +124,26 @@ func parseArgs(raw string) []string {
 	return strings.Fields(raw)
 }
 
-// PrintSummary outputs the current config state for debugging
+// ShouldPush returns whether the image should be pushed to the registry
+func (c *Config) ShouldPush() bool {
+	return c.OpenShiftEnv != "dev" || c.ForcePush
+}
+
+// PrintSummary displays a detailed summary of the loaded configuration.
 func (c *Config) PrintSummary() {
-	fmt.Println("---- SYAC CONFIG ----")
+	fmt.Println("--------- SYAC Build Configuration ---------")
+	fmt.Printf("User:               %s\n", c.User)
 	fmt.Printf("Registry:           %s\n", c.Registry)
-	fmt.Printf("Registry Path:      %s\n", c.RegistryImagePath)
-	fmt.Printf("Ref:                %s\n", c.Ref)
-	fmt.Printf("OpenShift Env:      %s\n", c.OpenShiftEnv)
-	fmt.Printf("App Name:           %s\n", c.ImageName())
+	fmt.Printf("Registry Image Path:%s\n", c.RegistryImagePath)
+	fmt.Printf("Project:            %s\n", c.Project)
+	fmt.Printf("Git Ref:            %s\n", c.Ref)
+	fmt.Printf("Commit SHA:         %s\n", c.CommitSHA)
 	fmt.Printf("Dockerfile:         %s\n", c.Dockerfile)
-	fmt.Printf("Should Push:        %v\n", c.ShouldPush())
+	fmt.Printf("Application Name:   %s\n", c.ImageName())
+	fmt.Printf("OpenShift Env:      %s\n", c.OpenShiftEnv)
+	fmt.Printf("Force Push:         %t\n", c.ForcePush)
+	fmt.Printf("Final Tag:          %s\n", c.Tag)
+	fmt.Printf("Target Image:       %s\n", c.TargetImage(c.Tag))
 	fmt.Printf("Extra Build Args:   %v\n", c.ExtraBuildArgs)
-	fmt.Println("---------------------")
+	fmt.Println("--------------------------------------------")
 }
