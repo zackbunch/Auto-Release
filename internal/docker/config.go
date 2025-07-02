@@ -13,19 +13,19 @@ type Config struct {
 	RegistryImagePath string   // Full image path with group/subgroup (from CI_REGISTRY_IMAGE)
 	Project           string   // GitLab project path (e.g. devops/syac/myapp)
 	Ref               string   // Git branch/ref name
-	CommitSHA         string   // CI commit hash, used for tagging dev builds
 	Dockerfile        string   // Dockerfile path, defaulting to "Dockerfile"
 	ExtraBuildArgs    []string // Optional space-separated build args
 	ApplicationName   string   // Optional image name override
 	OpenShiftEnv      string   // Derived OpenShift environment (e.g. dev, test, prod)
-	ForcePush         bool     // Force image push even for dev builds
-	Tag               string   // Final derived tag (commit SHA for dev, semantic version otherwise)
+	ForcePush         bool     // Force image push in dev
+	Sprint            string   // Sprint number for release candidate tags
+	Tag               string   // The final tag to use for image
+	InMergeRequest    bool     // Whether the current pipeline is running in a merge request
 }
 
 // LoadConfig populates the Config from environment variables and validates required fields
 func LoadConfig() (*Config, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
-	commitSHA := os.Getenv("CI_COMMIT_SHA")
 	openShiftEnv := deriveOpenShiftEnv(ref)
 
 	dockerfile := os.Getenv("SYAC_DOCKERFILE")
@@ -33,12 +33,12 @@ func LoadConfig() (*Config, error) {
 		dockerfile = "Dockerfile"
 	}
 
-	var tag string
-	if openShiftEnv == "dev" {
-		tag = commitSHA
-	} else {
-		tag = "0.0.1" // TODO: replace with dynamic versioning logic
-	}
+	shortSHA := os.Getenv("CI_COMMIT_SHORT_SHA")
+	sprint := os.Getenv("SYAC_SPRINT")
+	mrTarget := os.Getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME")
+	inMR := os.Getenv("CI_MERGE_REQUEST_ID") != ""
+
+	tag := determineTag(ref, mrTarget, sprint, shortSHA, inMR)
 
 	cfg := &Config{
 		User:              os.Getenv("CI_REGISTRY_USER"),
@@ -47,13 +47,14 @@ func LoadConfig() (*Config, error) {
 		RegistryImagePath: os.Getenv("CI_REGISTRY_IMAGE"),
 		Project:           os.Getenv("CI_PROJECT_PATH"),
 		Ref:               ref,
-		CommitSHA:         commitSHA,
 		OpenShiftEnv:      openShiftEnv,
 		Dockerfile:        dockerfile,
 		ExtraBuildArgs:    parseArgs(os.Getenv("SYAC_BUILD_EXTRA_ARGS")),
 		ApplicationName:   os.Getenv("SYAC_APPLICATION_NAME"),
 		ForcePush:         os.Getenv("SYAC_FORCE_PUSH") == "true",
+		Sprint:            sprint,
 		Tag:               tag,
+		InMergeRequest:    inMR,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -95,13 +96,13 @@ func (c *Config) ImageName() string {
 }
 
 // TargetImage returns the full image path with OpenShift environment and tag
-func (c *Config) TargetImage(tag string) string {
+func (c *Config) TargetImage() string {
 	path := strings.TrimSuffix(c.RegistryImagePath, "/")
 	return fmt.Sprintf("%s/%s/%s:%s",
 		path,
 		c.OpenShiftEnv,
 		c.ImageName(),
-		tag,
+		c.Tag,
 	)
 }
 
@@ -119,31 +120,36 @@ func deriveOpenShiftEnv(ref string) string {
 	}
 }
 
+// determineTag decides whether to use SHA or RC tag
+func determineTag(ref, mrTarget, sprint, shortSHA string, inMR bool) string {
+	if ref == "dev" && mrTarget == "dev" && inMR && sprint != "" {
+		return fmt.Sprintf("rc-sprint.%s", sprint)
+	}
+	return shortSHA
+}
+
 // parseArgs splits space-separated build args into a slice
 func parseArgs(raw string) []string {
 	return strings.Fields(raw)
 }
 
-// ShouldPush returns whether the image should be pushed to the registry
+// ShouldPush determines if image should be pushed
 func (c *Config) ShouldPush() bool {
 	return c.OpenShiftEnv != "dev" || c.ForcePush
 }
 
-// PrintSummary displays a detailed summary of the loaded configuration.
+// PrintSummary logs all relevant config for debugging
 func (c *Config) PrintSummary() {
-	fmt.Println("--------- SYAC Build Configuration ---------")
-	fmt.Printf("User:               %s\n", c.User)
-	fmt.Printf("Registry:           %s\n", c.Registry)
-	fmt.Printf("Registry Image Path:%s\n", c.RegistryImagePath)
-	fmt.Printf("Project:            %s\n", c.Project)
-	fmt.Printf("Git Ref:            %s\n", c.Ref)
-	fmt.Printf("Commit SHA:         %s\n", c.CommitSHA)
-	fmt.Printf("Dockerfile:         %s\n", c.Dockerfile)
-	fmt.Printf("Application Name:   %s\n", c.ImageName())
-	fmt.Printf("OpenShift Env:      %s\n", c.OpenShiftEnv)
-	fmt.Printf("Force Push:         %t\n", c.ForcePush)
-	fmt.Printf("Final Tag:          %s\n", c.Tag)
-	fmt.Printf("Target Image:       %s\n", c.TargetImage(c.Tag))
-	fmt.Printf("Extra Build Args:   %v\n", c.ExtraBuildArgs)
-	fmt.Println("--------------------------------------------")
+	fmt.Println("Resolved Configuration:")
+	fmt.Printf("  Registry:             %s\n", c.Registry)
+	fmt.Printf("  RegistryImagePath:    %s\n", c.RegistryImagePath)
+	fmt.Printf("  ApplicationName:      %s\n", c.ImageName())
+	fmt.Printf("  OpenShiftEnv:         %s\n", c.OpenShiftEnv)
+	fmt.Printf("  Dockerfile:           %s\n", c.Dockerfile)
+	fmt.Printf("  Tag:                  %s\n", c.Tag)
+	fmt.Printf("  Target Image:         %s\n", c.TargetImage())
+	fmt.Printf("  ForcePush:            %v\n", c.ForcePush)
+	fmt.Printf("  ExtraBuildArgs:       %v\n", c.ExtraBuildArgs)
+	fmt.Printf("  InMergeRequest:       %v\n", c.InMergeRequest)
+	fmt.Println()
 }

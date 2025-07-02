@@ -6,9 +6,9 @@ import (
 	"os/exec"
 )
 
-// BuildImage builds a Docker image with the specified tag
-func BuildImage(cfg *Config, tag string) error {
-	image := cfg.TargetImage(tag)
+// BuildImage builds a Docker image based on the config
+func BuildImage(cfg *Config) error {
+	image := cfg.TargetImage()
 
 	args := []string{
 		"build",
@@ -32,8 +32,8 @@ func BuildImage(cfg *Config, tag string) error {
 }
 
 // PushImage pushes the built Docker image to the registry
-func PushImage(cfg *Config, tag string) error {
-	image := cfg.TargetImage(tag)
+func PushImage(cfg *Config) error {
+	image := cfg.TargetImage()
 
 	if !cfg.ShouldPush() {
 		fmt.Printf("\n[SYAC] Skipping push for image %s (env = dev, no force push)\n", image)
