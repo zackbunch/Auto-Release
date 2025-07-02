@@ -1,7 +1,7 @@
 [SYAC] Semantic Versioning
-- [x] PATCH - Bug fixes only (`*.*.x`)
-- [ ] MINOR - New features, no breaking changes (`*.x.*`)
-- [ ] MAJOR - Breaking changes (`x.*.*`)
+- [x] **Patch** (`*.*.x`) - Bug fixes only
+- [ ] **Minor** (`*.x.*`) - New features, no breaking changes
+- [ ] **Major** (`x.*.*`) - Breaking changes
 
 [SYAC] Deployment Readiness
 - [ ] Ready for TEST environment
@@ -14,5 +14,4 @@
 - [ ] CHANGELOG updated
 - [ ] No secrets committed
 
-SYAC_DEV_NOTES:
-(Add any relevant context, ticket references, or additional info here)
+[SYAC] Developer Notes
