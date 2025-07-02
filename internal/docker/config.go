@@ -123,7 +123,7 @@ func deriveOpenShiftEnv(ref string) string {
 // determineTag decides whether to use SHA or RC tag
 func determineTag(ref, mrTarget, sprint, shortSHA string, inMR bool) string {
 	if ref == "dev" && mrTarget == "dev" && inMR && sprint != "" {
-		return fmt.Sprintf("rc-sprint.%s", sprint)
+		return fmt.Sprintf("rc.%s", sprint)
 	}
 	return shortSHA
 }
