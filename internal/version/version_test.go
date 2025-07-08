@@ -3,8 +3,6 @@ package version
 import (
 	"reflect"
 	"testing"
-
-	"syac/internal/semver"
 )
 
 func TestParse(t *testing.T) {
@@ -76,22 +74,22 @@ func TestInc(t *testing.T) {
 
 	tests := []struct {
 		name string
-		bump semver.VersionType
+		bump VersionType
 		want Version
 	}{
 		{
 			name: "Patch bump",
-			bump: semver.Patch,
+			bump: Patch,
 			want: Version{Major: 1, Minor: 2, Patch: 4},
 		},
 		{
 			name: "Minor bump",
-			bump: semver.Minor,
+			bump: Minor,
 			want: Version{Major: 1, Minor: 3, Patch: 0},
 		},
 		{
 			name: "Major bump",
-			bump: semver.Major,
+			bump: Major,
 			want: Version{Major: 2, Minor: 0, Patch: 0},
 		},
 		{

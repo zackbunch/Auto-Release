@@ -4,8 +4,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"syac/internal/semver"
+)
 
+// VersionType represents a semantic version bump level
+type VersionType string
+
+const (
+	Patch VersionType = "Patch"
+	Minor VersionType = "Minor"
+	Major VersionType = "Major"
 )
 
 type Version struct {
@@ -42,13 +49,13 @@ func Parse(versionStr string) (Version, error) {
 }
 
 // Inc returns a new Version incremented based on the given semantic version type
-func (v Version) Inc(bump semver.VersionType) Version {
+func (v Version) Inc(bump VersionType) Version {
 	switch bump {
-	case semver.Major:
+	case Major:
 		return Version{Major: v.Major + 1, Minor: 0, Patch: 0}
-	case semver.Minor:
+	case Minor:
 		return Version{Major: v.Major, Minor: v.Minor + 1, Patch: 0}
-	case semver.Patch:
+	case Patch:
 		return Version{Major: v.Major, Minor: v.Minor, Patch: v.Patch + 1}
 	default:
 		return v // no change if invalid bump type

@@ -2,39 +2,60 @@ package docker
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
+	"syac/internal/ci"
 )
 
-// RunCMD executes the given command with inherited stdout/stderr
-func RunCMD(name string, args ...string) error {
-	return run("", false, name, args...)
-}
+func Execute(ctx ci.Context) error {
+	ctx.PrintSummary()
 
-// RunCMDWithDir executes the command in a specific directory
-func RunCMDWithDir(dir, name string, args ...string) error {
-	return run(dir, false, name, args...)
-}
-
-// DryRun logs the command that would be run without executing
-func DryRun(name string, args ...string) {
-	run("", true, name, args...)
-}
-
-// internal runner to consolidate logic for stdout/stderr
-func run(dir string, dry bool, name string, args ...string) error {
-	fullCmd := fmt.Sprintf("%s %s", name, strings.Join(args, " "))
-	if dry {
-		fmt.Printf("[DRY RUN] %s\n", fullCmd)
-		return nil
+	opts, err := BuildOptionsFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to prepare docker build options: %w", err)
 	}
 
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	switch {
+	case ctx.IsMergeRequest:
+		return handleMergeRequest(opts)
+	case ctx.IsTag:
+		return handleTagPush(opts)
+	case ctx.IsProtected:
+		return handleProtectedBranch(opts)
+	case ctx.IsFeatureBranch:
+		return handleFeatureBranch(opts)
+	default:
+		fmt.Println("Unknown context — skipping execution.")
+		return nil
+	}
+}
 
-	fmt.Printf("Running: %s\n", fullCmd)
-	return cmd.Run()
+func handleMergeRequest(opts *BuildOptions) error {
+	fmt.Println("Merge request detected. TODO: implement version bump + metadata checks")
+	return nil
+}
+
+func handleTagPush(opts *BuildOptions) error {
+	fmt.Println("Tag push detected. TODO: validate and promote tagged release")
+	return nil
+}
+
+func handleProtectedBranch(opts *BuildOptions) error {
+	fmt.Println("Protected branch push detected. Building and pushing image...")
+	if err := BuildImage(opts); err != nil {
+		return err
+	}
+	if opts.Push {
+		return PushImage(opts)
+	}
+	return nil
+}
+
+func handleFeatureBranch(opts *BuildOptions) error {
+	fmt.Println("Feature branch push detected. Building image...")
+	if err := BuildImage(opts); err != nil {
+		return err
+	}
+	if opts.Push {
+		return PushImage(opts)
+	}
+	return nil
 }
