@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"syac/internal/config"
 )
 
 type Context struct {
@@ -20,9 +22,23 @@ type Context struct {
 	IsMergeRequest  bool
 	IsTag           bool
 	IsFeatureBranch bool
+
+	Config *config.Config
 }
 
-func LoadContext() Context {
+func LoadContext() (Context, error) {
+	cfg, err := config.LoadConfig(".syac.yml")
+	if err != nil {
+		// if the config file doesn't exist, we can use default values
+		if os.IsNotExist(err) {
+			cfg = &config.Config{
+				ProtectedBranches: []string{"main", "dev", "release", "staging"},
+			}
+		} else {
+			return Context{}, fmt.Errorf("failed to load config: %w", err)
+		}
+	}
+
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
 	return Context{
 		Source:          os.Getenv("CI_PIPELINE_SOURCE"),
@@ -33,16 +49,16 @@ func LoadContext() Context {
 		RegistryImage:   os.Getenv("CI_REGISTRY_IMAGE"),
 		DefaultBranch:   os.Getenv("CI_DEFAULT_BRANCH"),
 		Sprint:          os.Getenv("SYAC_SPRINT"),
-		IsProtected:     isProtectedBranch(ref),
+		IsProtected:     isProtectedBranch(ref, cfg.ProtectedBranches),
 		IsMergeRequest:  os.Getenv("CI_PIPELINE_SOURCE") == "merge_request_event",
 		IsTag:           strings.HasPrefix(ref, "refs/tags/"),
-		IsFeatureBranch: !isProtectedBranch(ref) && !strings.HasPrefix(ref, "refs/tags/"),
-	}
+		IsFeatureBranch: !isProtectedBranch(ref, cfg.ProtectedBranches) && !strings.HasPrefix(ref, "refs/tags/"),
+		Config:          cfg,
+	}, nil
 }
 
-func isProtectedBranch(ref string) bool {
-	protected := []string{"main", "dev", "release", "staging"}
-	for _, b := range protected {
+func isProtectedBranch(ref string, protectedBranches []string) bool {
+	for _, b := range protectedBranches {
 		if ref == b || strings.HasPrefix(ref, b+"/") {
 			return true
 		}

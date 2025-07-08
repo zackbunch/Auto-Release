@@ -67,12 +67,7 @@ func deriveOpenShiftEnv(ref string) string {
 }
 
 func generateTag(ctx ci.Context) string {
-	shortSHA := os.Getenv("CI_COMMIT_SHORT_SHA")
-	sprint := os.Getenv("SYAC_SPRINT")
-	if ctx.RefName == "dev" && ctx.IsMergeRequest && ctx.MRID != "" && sprint != "" {
-		return fmt.Sprintf("rc.%s", sprint)
-	}
-	return shortSHA
+	return os.Getenv("CI_COMMIT_SHORT_SHA")
 }
 
 func shouldPush(env string, force bool) bool {
