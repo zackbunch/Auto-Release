@@ -1,58 +1,112 @@
 # SYAC - Saved You A Click
 
-SYAC is a GitLab-native build automation tool written in Go. It streamlines the container build and promotion process for microservices deployed via GitLab CI/CD, targeting OpenShift environments.
+SYAC is a GitLab-native build automation tool written in Go. It streamlines the container image build and promotion process for microservices deployed via GitLab CI/CD, targeting OpenShift environments.
 
----
+## Purpose
 
-## What It Does
+The primary goal of SYAC is to automate the Docker image building and pushing process within a GitLab CI/CD pipeline. It intelligently determines image tags and whether to push an image based on the CI context (e.g., branch type, tags).
 
-- Reads from GitLab CI environment variables and a `.env` file for local testing.
-- Builds and tags Docker images based on:
-  - **Feature branches** → uses `CI_COMMIT_SHORT_SHA`
-  - **Merge requests into `dev`** → creates **Release Candidate (RC)** tags like `rc.42`
-- Pushes images based on derived logic (e.g. skips push for dev unless `SYAC_FORCE_PUSH=true`).
-- Supports configuration via environment variables with sane defaults.
+## Features
 
----
+-   **Environment-driven Configuration:** Reads configuration from GitLab CI environment variables and supports local testing via `.env` files.
+-   **Intelligent Image Tagging:**
+    -   **Feature Branches:** Images are tagged with `CI_COMMIT_SHORT_SHA`.
+    -   **Protected Branches (e.g., `main`, `release`):** Images are tagged with `CI_COMMIT_SHORT_SHA`.
+    -   **`dev` Branch (Merge/Push):** Images are tagged as `rc.N` where `N` is provided via `SYAC_RC_NUMBER`.
+    -   **Tag Pushes:** Images are tagged with `CI_COMMIT_SHORT_SHA`.
+-   **Conditional Image Pushing:** Images are pushed to the registry based on the environment. By default, images for `dev` environment are not pushed unless explicitly forced (`SYAC_FORCE_PUSH=true`). Images for `prod`, `test`, `int` environments are always pushed.
+-   **Dry Run Capability:** Supports a dry run mode (`SYAC_DRY_RUN=true`) that logs commands without executing them, useful for debugging and verification.
+-   **Flexible Dockerfile and Build Context:** Allows specifying custom Dockerfile paths and build contexts via environment variables (`SYAC_DOCKERFILE`, `SYAC_BUILD_CONTEXT`).
 
-## 🔧 Project Structure
+## How It Works
+
+SYAC analyzes the GitLab CI environment context to determine the appropriate build and push actions.
+
+```mermaid
+flowchart TD
+    A[Start SYAC] --> B{Load CI Context};
+    B --> C{Determine Build Options};
+    C --> D{Is Tag Push?};
+    D -- Yes --> E[Build and Push Image];
+    D -- No --> F{Is Protected Branch?};
+    F -- Yes --> G{Is 'dev' Branch (Merge/Push)?};
+    G -- Yes --> H[Build and Push RC Image];
+    G -- No --> I[Build and Push Image (Protected)];
+    F -- No --> J{Is Feature Branch?};
+    J -- Yes --> K[Build Image (Conditional Push)];
+    J -- No --> L[Unknown Context - Skip];
+    E --> M[End];
+    H --> M;
+    I --> M;
+    K --> M;
+    L --> M;
+```
+
+## Project Structure
 
 ```plaintext
 syac/
-├── main.go                     # Entry point for CLI
-├── Dockerfile                  # Simple Go build container
+├── main.go                     # Entry point for the CLI application.
+├── Dockerfile                  # Dockerfile for building the SYAC application itself.
 ├── internal/
-│   └── docker/
-│       ├── config.go           # Loads and validates environment config
-│       ├── builder.go          # Docker build logic
-│       ├── runner.go           # Optional CLI helpers
-├── test/
-│   ├── integration_test.go     # Full-flow integration test using `.env.dev`
-│   └── testdata/
-│       └── .env.dev            # Sample environment for local testing
-└── .env                        # Local override of GitLab CI vars
+│   ├── ci/                     # Contains CI context loading and environment variable handling.
+│   │   ├── context.go          # Loads and parses GitLab CI environment variables.
+│   │   └── env.go              # Handles loading of .env files.
+│   ├── config/                 # Application configuration.
+│   │   └── config.go           # Loads SYAC specific configuration (e.g., protected branches).
+│   ├── docker/                 # Core Docker operations.
+│   │   ├── build.go            # Handles Docker image building.
+│   │   ├── build_options.go    # Derives Docker build options from CI context and environment variables.
+│   │   ├── cmd.go              # Utility for running shell commands (e.g., `docker`).
+│   │   ├── push.go             # Handles Docker image pushing and registry login.
+│   │   └── runner.go           # Main logic for orchestrating Docker build and push based on CI context.
+│   └── version/                # Semantic versioning logic.
+│       └── version.go          # Defines Version struct and methods for parsing and incrementing versions.
+├── .env                        # Local override of GitLab CI variables for development.
+├── go.mod                      # Go module definition.
+├── go.sum                      # Go module checksums.
+└── README.md                   # This documentation.
 ```
-```mermaid
-flowchart TD
 
-  A["Feature Branch Commit"] -->|Uses CI_COMMIT_SHORT_SHA| T1["Tag = short SHA"]
-  B["Merge into Dev"] -->|Uses SYAC_SPRINT| T2["Tag = rc.N"]
-  T1 --> D["Build Only"]
-  T2 --> P["Build + Push"]
+## Usage
+
+To use SYAC, ensure your GitLab CI/CD pipeline sets the necessary environment variables (e.g., `CI_COMMIT_SHORT_SHA`, `CI_REGISTRY_IMAGE`).
+
+For local testing, you can use a `.env` file and pass it via the `-env` flag:
+
+```bash
+go run main.go -env .env
 ```
 
-## Future Enhancements
+To enable dry run mode:
 
-- **Automatic Semantic Version Bumping**  
-  Analyze Merge Request comments for version bump hints:
-  - `#patch`, `#minor`, or `#major`
-  - Apply bump logic accordingly (e.g., 1.2.3 → 1.2.4, 1.3.0, or 2.0.0)
+```bash
+SYAC_DRY_RUN=true go run main.go
+```
 
-- **Changelog Generation**  
-  Generate/update changelogs as part of the tagging process.
+To force a push even for `dev` environment:
 
-- **Multi-registry Promotion**  
-  Add support for registry path rewriting or cross-registry mirroring for different environments.
+```bash
+SYAC_FORCE_PUSH=true go run main.go
+```
 
-- **Dry Run Support**  
-  Add a mode that prints actions without executing them, useful for debugging or verification.
+## Environment Variables
+
+| Variable              | Description                                                                 | Default Value |
+| :-------------------- | :-------------------------------------------------------------------------- | :------------ |
+| `SYAC_DOCKERFILE`     | Path to the Dockerfile to use for building the image.                       | `Dockerfile`  |
+| `SYAC_BUILD_CONTEXT`  | Path to the build context for Docker.                                       | `.`           |
+| `SYAC_BUILD_EXTRA_ARGS` | Additional arguments to pass to `docker build`. (e.g., `--no-cache`)      | (empty)       |
+| `SYAC_APPLICATION_NAME` | The name of the application, used in the image tag.                         | Derived from `CI_REGISTRY_IMAGE` |
+| `SYAC_FORCE_PUSH`     | Set to `true` to force image push even for `dev` environment.               | `false`       |
+| `SYAC_DRY_RUN`        | Set to `true` to enable dry run mode (commands are logged but not executed).| `false`       |
+| `SYAC_RC_NUMBER`      | The release candidate number (N) for `rc.N` tags on `dev` branch merges/pushes. | (required for RC) |
+| `CI_COMMIT_SHORT_SHA` | GitLab CI variable: Short SHA of the current commit.                        | (required)    |
+| `CI_REGISTRY_IMAGE`   | GitLab CI variable: Full path to the Docker image in the registry.          | (required)    |
+| `CI_COMMIT_REF_NAME`  | GitLab CI variable: Name of the branch or tag.                              | (required)    |
+| `CI_PIPELINE_SOURCE`  | GitLab CI variable: Source of the pipeline (e.g., `push`, `merge_request_event`). | (required)    |
+| `CI_PROJECT_PATH`     | GitLab CI variable: Path to the project.                                    | (required)    |
+| `CI_DEFAULT_BRANCH`   | GitLab CI variable: Default branch of the project.                          | (required)    |
+| `CI_REGISTRY`         | GitLab CI variable: URL of the Docker registry.                             | (required for push) |
+| `CI_REGISTRY_USER`    | GitLab CI variable: Username for Docker registry login.                     | (required for push) |
+| `CI_REGISTRY_PASSWORD`| GitLab CI variable: Password for Docker registry login.                     | (required for push) |

@@ -67,6 +67,14 @@ func deriveOpenShiftEnv(ref string) string {
 }
 
 func generateTag(ctx ci.Context) string {
+	// Check for merge into dev for RC tag
+	if ctx.RefName == "dev" && (ctx.Source == "merge_request_event" || ctx.Source == "push") {
+		rcNumber := os.Getenv("SYAC_RC_NUMBER")
+		if rcNumber != "" {
+			return fmt.Sprintf("rc.%s", rcNumber)
+		}
+	}
+	// Default to short SHA
 	return os.Getenv("CI_COMMIT_SHORT_SHA")
 }
 
