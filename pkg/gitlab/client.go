@@ -19,6 +19,7 @@ type Client struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
+	projectID  string // New field
 }
 
 // GitLabError represents an error response from the GitLab API
@@ -34,7 +35,7 @@ func (e *GitLabError) Error() string {
 
 // NewClient creates a new GitLab client using environment variables.
 func NewClient() (*Client, error) {
-	var baseURL, token string
+	var baseURL, token, projectID string // Add projectID
 
 	isPipeline := os.Getenv("GITLAB_CI") == "true"
 
@@ -45,9 +46,11 @@ func NewClient() (*Client, error) {
 			// Optional fallback for impersonation token
 			token = os.Getenv("SYAC_TOKEN")
 		}
+		projectID = os.Getenv("CI_PROJECT_ID") // Get project ID
 	} else {
 		baseURL = os.Getenv("GITLAB_BASE_URL")
 		token = os.Getenv("GITLAB_API_TOKEN")
+		projectID = os.Getenv("GITLAB_PROJECT_ID") // Get project ID for local
 	}
 
 	if token == "" {
@@ -55,6 +58,10 @@ func NewClient() (*Client, error) {
 			return nil, errors.New("CI_JOB_TOKEN or SYAC_TOKEN must be set in CI mode")
 		}
 		return nil, errors.New("GITLAB_API_TOKEN must be set in local mode")
+	}
+
+	if projectID == "" { // New check
+		return nil, errors.New("CI_PROJECT_ID or GITLAB_PROJECT_ID must be set")
 	}
 
 	if _, err := url.ParseRequestURI(baseURL); err != nil {
@@ -75,6 +82,7 @@ func NewClient() (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		projectID: projectID, // Set project ID
 	}, nil
 }
 
