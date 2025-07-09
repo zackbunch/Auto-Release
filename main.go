@@ -6,6 +6,7 @@ import (
 
 	"syac/internal/ci"
 	"syac/internal/docker"
+	"syac/pkg/gitlab"
 )
 
 func main() {
@@ -20,7 +21,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := docker.Execute(ctx); err != nil {
+	// Create GitLab client
+	gitlabClient, err := gitlab.NewClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create GitLab client: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := docker.Execute(ctx, gitlabClient); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: execution failed: %v\n", err)
 		os.Exit(1)
 	}

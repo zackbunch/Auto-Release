@@ -14,28 +14,40 @@ import (
 	"time"
 )
 
-// Client represents a GitLab API client
+// Client represents a GitLab API client.
+// It holds the base URL, authentication token, HTTP client, and the project ID
+// for project-scoped API calls. It also exposes various GitLab API services.
 type Client struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
-	projectID  string // New field
+	projectID  string
+
+	// Services
+	MergeRequests MergeRequestsService
+	// Add other services here as they are implemented, e.g., Tags, Projects, etc.
 }
 
-// GitLabError represents an error response from the GitLab API
+// GitLabError represents an error response from the GitLab API.
 type GitLabError struct {
 	StatusCode int
 	Message    string
 	Body       []byte
 }
 
+// Error returns a string representation of the GitLabError.
 func (e *GitLabError) Error() string {
 	return fmt.Sprintf("GitLab API error (%d): %s -- %s", e.StatusCode, e.Message, string(e.Body))
 }
 
-// NewClient creates a new GitLab client using environment variables.
+// NewClient creates a new GitLab client using environment variables for configuration.
+// It supports both GitLab CI pipeline mode and local development mode.
+// Required environment variables:
+//   - CI mode: GITLAB_CI=true, CI_API_V4_URL, CI_JOB_TOKEN (or SYAC_TOKEN), CI_PROJECT_ID
+//   - Local mode: GITLAB_BASE_URL, GITLAB_API_TOKEN, GITLAB_PROJECT_ID
+// An optional GITLAB_CLIENT_TIMEOUT_SECONDS can be set to configure the HTTP client timeout.
 func NewClient() (*Client, error) {
-	var baseURL, token, projectID string // Add projectID
+	var baseURL, token, projectID string
 
 	isPipeline := os.Getenv("GITLAB_CI") == "true"
 
@@ -46,11 +58,11 @@ func NewClient() (*Client, error) {
 			// Optional fallback for impersonation token
 			token = os.Getenv("SYAC_TOKEN")
 		}
-		projectID = os.Getenv("CI_PROJECT_ID") // Get project ID
+		projectID = os.Getenv("CI_PROJECT_ID")
 	} else {
 		baseURL = os.Getenv("GITLAB_BASE_URL")
 		token = os.Getenv("GITLAB_API_TOKEN")
-		projectID = os.Getenv("GITLAB_PROJECT_ID") // Get project ID for local
+		projectID = os.Getenv("GITLAB_PROJECT_ID")
 	}
 
 	if token == "" {
@@ -60,7 +72,7 @@ func NewClient() (*Client, error) {
 		return nil, errors.New("GITLAB_API_TOKEN must be set in local mode")
 	}
 
-	if projectID == "" { // New check
+	if projectID == "" {
 		return nil, errors.New("CI_PROJECT_ID or GITLAB_PROJECT_ID must be set")
 	}
 
@@ -76,17 +88,24 @@ func NewClient() (*Client, error) {
 		}
 	}
 
-	return &Client{
+	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		token:   token,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		projectID: projectID, // Set project ID
-	}, nil
+		projectID: projectID,
+	}
+
+	// Initialize services
+	c.MergeRequests = &mrsService{client: c}
+
+	return c, nil
 }
 
 // DoRequest sends an HTTP request to the GitLab API and returns the response body.
+// It handles request creation, authentication, execution, and error parsing.
+// The 'path' should be relative to the /api/v4 endpoint (e.g., "/projects/123/merge_requests/456").
 func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
@@ -130,7 +149,7 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error
 	return respData, nil
 }
 
-// urlEncode safely encodes a GitLab project path (e.g., "group/project" -> "group%2Fproject")
+// urlEncode safely encodes a GitLab project path (e.g., "group/project" -> "group%2Fproject").
 func urlEncode(s string) string {
 	return url.PathEscape(s)
 }
