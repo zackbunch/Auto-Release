@@ -44,13 +44,9 @@ func handleMergeRequest(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab
 	}
 	fmt.Printf("Next version: %s -> %s", current.String(), next.String())
 
-	// Replace the old tag (which is likely a SHA) with the new semantic version tag.
-	imageParts := strings.Split(opts.FullImage, ":")
-	imageParts[len(imageParts)-1] = next.String()
-	opts.FullImage = strings.Join(imageParts, ":")
-	opts.TargetTag = next.String()
-
-	return buildAndPush(ctx, opts)
+	// In a merge request, we only calculate and display the proposed version.
+	// The actual image build and push happens on the target branch after merge.
+	return nil
 }
 
 func handleTagPush(ctx ci.Context, opts *BuildOptions) error {

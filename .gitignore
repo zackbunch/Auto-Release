@@ -1,3 +1,4 @@
 *.env
 /test/mocks/docker
 *.json
+.gitlab-ci.yml
