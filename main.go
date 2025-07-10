@@ -1,43 +1,35 @@
 package main
 
 import (
-	"log"
-	"syac/internal/docker"
+	"fmt"
+	"os"
 
-	"github.com/joho/godotenv"
+	"syac/internal/ci"
+	"syac/internal/docker"
+	"syac/pkg/gitlab"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal(err)
+	if err := ci.LoadEnvFileFromFlag(os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to load env: %v\n", err)
+		os.Exit(1)
 	}
-	log.Println("Starting SYAC Image Build...")
 
-	cfg, err := docker.LoadConfig()
+	ctx, err := ci.LoadContext()
 	if err != nil {
-		log.Fatalf("Environment Configuration error: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: failed to load context: %v\n", err)
+		os.Exit(1)
 	}
 
-	cfg.PrintSummary()
-	log.Printf("Tag resolved to: %s", cfg.Tag)
-
-	if err := docker.BuildImage(cfg); err != nil {
-		log.Fatalf("Image build failed: %v", err)
+	// Create GitLab client
+	gitlabClient, err := gitlab.NewClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create GitLab client: %v\n", err)
+		os.Exit(1)
 	}
 
-	if cfg.ShouldPush() {
-		if err := docker.PushImage(cfg); err != nil {
-			log.Fatalf("Image push failed: %v", err)
-		}
-		log.Printf("Image pushed to: %s", cfg.TargetImage())
-	} else {
-		log.Println("Skipping image push (dev branch and SYAC_FORCE_PUSH not set)")
-	}
-
-	if cfg.EmitMetadata {
-		if err := docker.WriteMetadata(cfg); err != nil {
-			log.Fatalf("Failed to emit metadata: %v", err)
-		}
-		log.Println("Metadata written to syac_output.json")
+	if err := docker.Execute(ctx, gitlabClient); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: execution failed: %v\n", err)
+		os.Exit(1)
 	}
 }
