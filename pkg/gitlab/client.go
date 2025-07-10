@@ -22,6 +22,7 @@ type Client struct {
 	token      string
 	httpClient *http.Client
 	projectID  string
+	IsPipeline bool // Added field
 
 	// Services
 	MergeRequests MergeRequestsService
@@ -95,7 +96,8 @@ func NewClient() (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		projectID: projectID,
+		projectID:  projectID,
+		IsPipeline: isPipeline, // Initialize the new field
 	}
 
 	// Initialize services
@@ -124,7 +126,12 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error
 		return nil, fmt.Errorf("failed to create request [%s %s]: %w", method, fullURL, err)
 	}
 
-	req.Header.Set("PRIVATE-TOKEN", c.token)
+	// Determine which token header to use
+	tokenHeader := "PRIVATE-TOKEN"
+	if c.IsPipeline { // Use the new field
+		tokenHeader = "JOB-TOKEN"
+	}
+	req.Header.Set(tokenHeader, c.token)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
