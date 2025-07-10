@@ -67,6 +67,11 @@ func deriveOpenShiftEnv(ref string) string {
 }
 
 func generateTag(ctx ci.Context) string {
+	// If it's a tag push (a release), use the tag name itself.
+	if ctx.IsTag {
+		return ctx.RefName
+	}
+
 	// Check for merge into dev for RC tag
 	if ctx.RefName == "dev" && (ctx.Source == "merge_request_event" || ctx.Source == "push") {
 		rcNumber := os.Getenv("SYAC_RC_NUMBER")

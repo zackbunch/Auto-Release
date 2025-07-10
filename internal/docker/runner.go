@@ -54,7 +54,7 @@ func handleMergeRequest(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab
 }
 
 func handleTagPush(opts *BuildOptions) error {
-	fmt.Println("Tag push detected. Building and pushing image...")
+	fmt.Println("Release tag detected. Building and pushing image...")
 	return buildAndPush(opts)
 }
 
