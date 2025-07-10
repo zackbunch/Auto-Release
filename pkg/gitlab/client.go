@@ -25,7 +25,7 @@ type Client struct {
 
 	// Services
 	MergeRequests MergeRequestsService
-	// Add other services here as they are implemented, e.g., Tags, Projects, etc.
+	Tags          TagsService
 }
 
 // GitLabError represents an error response from the GitLab API.
@@ -45,6 +45,7 @@ func (e *GitLabError) Error() string {
 // Required environment variables:
 //   - CI mode: GITLAB_CI=true, CI_API_V4_URL, CI_JOB_TOKEN (or SYAC_TOKEN), CI_PROJECT_ID
 //   - Local mode: GITLAB_BASE_URL, GITLAB_API_TOKEN, GITLAB_PROJECT_ID
+//
 // An optional GITLAB_CLIENT_TIMEOUT_SECONDS can be set to configure the HTTP client timeout.
 func NewClient() (*Client, error) {
 	var baseURL, token, projectID string
@@ -99,6 +100,7 @@ func NewClient() (*Client, error) {
 
 	// Initialize services
 	c.MergeRequests = &mrsService{client: c}
+	c.Tags = &tagsService{client: c}
 
 	return c, nil
 }
