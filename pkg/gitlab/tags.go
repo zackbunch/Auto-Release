@@ -93,14 +93,9 @@ func (s *tagsService) CreateTag(tagName, ref, message string) error {
 }
 
 func (s *tagsService) GetNextVersion(bump version.VersionType) (version.Version, version.Version, error) {
-	latestTagStr, err := s.GetLatestTag()
+	current, err := s.GetLatestTag()
 	if err != nil {
 		return version.Version{}, version.Version{}, fmt.Errorf("failed to get latest tag: %w", err)
-	}
-
-	current, err := version.Parse(latestTagStr.String())
-	if err != nil {
-		return version.Version{}, version.Version{}, fmt.Errorf("failed to get parse latest version: %w", err)
 	}
 
 	next := current.Increment(bump)

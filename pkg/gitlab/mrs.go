@@ -81,33 +81,29 @@ func (s *mrsService) GetMergeRequestNotes(mrID string) ([]MergeRequestNote, erro
 	return notes, nil
 }
 
-// ParseVersionNote scans a comment body for a SYAC MR note and returns the selected version bump
-func ParseVersionNote(notes []MergeRequestNote) (version.VersionType, error) {
-	checkboxRe := regexp.MustCompile(`^- \[x\] \*\*(Patch|Minor|Major)\*\*`)
-	for _, note := range notes {
-		if strings.HasPrefix(note.Body, "[SYAC]") {
-			lines := strings.Split(note.Body, "\n")
-			for _, line := range lines {
-				if matches := checkboxRe.FindStringSubmatch(line); len(matches) > 1 {
-					return version.VersionType(matches[1]), nil
-				}
-			}
+// ParseVersionFromDescription scans the MR description for a SYAC version checkbox
+func ParseVersionFromDescription(description string) (version.VersionType, error) {
+	checkboxRe := regexp.MustCompile(`- \[x\] \*\*(Patch|Minor|Major)\*\*`)
+	lines := strings.Split(description, "\n")
+	for _, line := range lines {
+		if matches := checkboxRe.FindStringSubmatch(line); len(matches) > 1 {
+			return version.VersionType(matches[1]), nil
 		}
 	}
 
-	fmt.Println("WARNING: No version type checkbox checked. Defaulting to Patch.")
+	fmt.Println("WARNING: No version type checkbox checked in MR description. Defaulting to Patch.")
 	return "Patch", nil
 }
 
 func (s *mrsService) GetVersionBump(mrID string) (version.VersionType, error) {
-	notes, err := s.GetMergeRequestNotes(mrID)
+	description, err := s.GetMergeRequestDescription(mrID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get MR notes: %w", err)
+		return "", fmt.Errorf("failed to get MR description: %w", err)
 	}
 
-	bumpType, err := ParseVersionNote(notes)
+	bumpType, err := ParseVersionFromDescription(description)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse version note: %w", err)
+		return "", fmt.Errorf("failed to parse version from description: %w", err)
 	}
 
 	return bumpType, nil
