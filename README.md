@@ -11,8 +11,8 @@ The primary goal of SYAC is to automate the Docker image building and pushing pr
 -   **Environment-driven Configuration:** Reads configuration from GitLab CI environment variables and supports local testing via `.env` files.
 -   **Intelligent Image Tagging:**
     -   **Feature Branches:** Images are tagged with `CI_COMMIT_SHORT_SHA`.
+    -   **`dev` Branch:** Images are tagged as `rc-<CI_COMMIT_SHORT_SHA>` to create a unique release candidate for each merge.
     -   **Protected Branches (e.g., `main`, `release`):** Images are tagged with `CI_COMMIT_SHORT_SHA`.
-    -   **`dev` Branch (Merge/Push):** Images are tagged as `rc.N` where `N` is provided via `SYAC_RC_NUMBER`.
     -   **Tag Pushes:** Images are tagged with the Git tag itself (e.g., `1.2.3`).
     -   **Latest Tag:** Pushes to the default branch (e.g., `main`) or new version tags will also be tagged as `latest`.
 -   **Conditional Image Pushing:** Images are pushed to the registry based on the environment. By default, images for `dev` environment are not pushed unless explicitly forced (`SYAC_FORCE_PUSH=true`). Images for `prod`, `test`, `int` environments are always pushed.
@@ -101,7 +101,6 @@ SYAC_FORCE_PUSH=true go run main.go
 | `SYAC_APPLICATION_NAME` | The name of the application, used in the image tag.                         | Derived from `CI_REGISTRY_IMAGE` |
 | `SYAC_FORCE_PUSH`     | Set to `true` to force image push even for `dev` environment.               | `false`       |
 | `SYAC_DRY_RUN`        | Set to `true` to enable dry run mode (commands are logged but not executed).| `false`       |
-| `SYAC_RC_NUMBER`      | The release candidate number (N) for `rc.N` tags on `dev` branch merges/pushes. | (required for RC) |
 | `CI_COMMIT_SHORT_SHA` | GitLab CI variable: Short SHA of the current commit.                        | (required)    |
 | `CI_REGISTRY_IMAGE`   | GitLab CI variable: Full path to the Docker image in the registry.          | (required)    |
 | `CI_COMMIT_REF_NAME`  | GitLab CI variable: Name of the branch or tag.                              | (required)    |

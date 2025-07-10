@@ -72,14 +72,12 @@ func generateTag(ctx ci.Context) string {
 		return ctx.RefName
 	}
 
-	// Check for merge into dev for RC tag
-	if ctx.RefName == "dev" && (ctx.Source == "merge_request_event" || ctx.Source == "push") {
-		rcNumber := os.Getenv("SYAC_RC_NUMBER")
-		if rcNumber != "" {
-			return fmt.Sprintf("rc.%s", rcNumber)
-		}
+	// For the 'dev' branch, create a release candidate tag with the commit SHA.
+	if ctx.RefName == "dev" {
+		return fmt.Sprintf("rc-%s", os.Getenv("CI_COMMIT_SHORT_SHA"))
 	}
-	// Default to short SHA
+
+	// Default to short SHA for all other branches (feature, protected, etc.)
 	return os.Getenv("CI_COMMIT_SHORT_SHA")
 }
 
