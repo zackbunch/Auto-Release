@@ -55,7 +55,8 @@ func (s *tagsService) GetLatestTag() (version.Version, error) {
 	}
 
 	if len(parsedVersions) == 0 {
-		return version.Version{}, fmt.Errorf("no valid semantic version tags found")
+		// If no valid semantic version tags are found, start from 0.0.0
+		return version.Version{Major: 0, Minor: 0, Patch: 0}, nil
 	}
 
 	sort.Slice(parsedVersions, func(i, j int) bool {
