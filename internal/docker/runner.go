@@ -1,110 +1,65 @@
-package docker
+func handlePromotion(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab.Client) error{
+	fmt.Printf("Promotion to %s branch detected. Promoting image...\n", ctx.RefName)
 
-import (
-	"fmt"
-	"strings"
-	"syac/internal/ci"
-	"syac/pkg/gitlab"
-)
-
-func Execute(ctx ci.Context, gitlabClient *gitlab.Client) error { // Modified signature
-	ctx.PrintSummary()
-
-	opts, err := BuildOptionsFromContext(ctx)
+	// Get the current commit (the merge commit)
+	currentCommit, err := gitlabClient.Commits.GetCommit(ctx.SHA)
 	if err != nil {
-		return fmt.Errorf("failed to prepare docker build options: %w", err)
+		return fmt.Errorf("failed to get current commit %s: %w", ctx.SHA, err)
 	}
 
-	switch {
-	case ctx.IsMergeRequest: // Re-add merge request handling
-		return handleMergeRequest(ctx, opts, gitlabClient)
-	case ctx.IsTag:
-		return handleTagPush(ctx, opts)
-	case ctx.IsProtected:
-		return handleProtectedBranch(ctx, opts)
-	case ctx.IsFeatureBranch:
-		return handleFeatureBranch(ctx, opts)
+	if len(currentCommit.ParentIDs) < 2 {
+		return fmt.Errorf("commit %s is not a merge commit, cannot determine source image for promotion", ctx.SHA)
+	}
+
+	// The second parent of a merge commit is the HEAD of the branch that was merged in.
+	// This is the SHA we need to find the source image.
+	sourceSHA := currentCommit.ParentIDs[1]
+
+	// Determine the source image tag based on the previous environment
+	// For dev -> test, source will be rc-<sha>
+	// For test -> int, source will be test-<sha>
+	var sourceTagPrefix string
+	switch ctx.RefName {
+	case "test":
+		sourceTagPrefix = "rc-"
+	case "int":
+		sourceTagPrefix = "test-"
 	default:
-		fmt.Println("Unknown context — skipping execution.")
-		return nil
+		return fmt.Errorf("unsupported promotion target branch: %s", ctx.RefName)
 	}
-}
 
-func handleMergeRequest(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab.Client) error {
-	fmt.Println("Merge request detected. Checking for version bump hint...")
+	sourceImage := fmt.Sprintf("%s:%s%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], sourceTagPrefix, sourceSHA[:8]) // Use short SHA for source tag
+	targetImage := fmt.Sprintf("%s:%s-%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], ctx.RefName, ctx.SHA[:8]) // Use short SHA for target tag
 
-	bumpType, err := gitlabClient.MergeRequests.GetVersionBump(ctx.MRID)
-	if err != nil {
-		return fmt.Errorf("failed to get version bump from MR notes: %w", err)
-	}
-	fmt.Printf("Detected bump type %s", bumpType)
-	current, next, err := gitlabClient.Tags.GetNextVersion(bumpType)
-	if err != nil {
-		return fmt.Errorf("failed to calculate next version: %w", err)
-	}
-	fmt.Printf("Next version: %s -> %s", current.String(), next.String())
+	fmt.Printf("Attempting to promote image from %s to %s\n", sourceImage, targetImage)
 
-	// In a merge request, we only calculate and display the proposed version.
-	// The actual image build and push happens on the target branch after merge.
-	return nil
-}
-
-func handleTagPush(ctx ci.Context, opts *BuildOptions) error {
-	fmt.Println("Release tag detected. Building and pushing image...")
-	return buildAndPush(ctx, opts)
-}
-
-func handleProtectedBranch(ctx ci.Context, opts *BuildOptions) error {
-	fmt.Println("Protected branch push detected. Building and pushing image...")
-	return buildAndPush(ctx, opts)
-}
-
-func handleFeatureBranch(ctx ci.Context, opts *BuildOptions) error {
-	fmt.Println("Feature branch push detected. Building image...")
-	return buildAndPush(ctx, opts)
-}
-
-func buildAndPush(ctx ci.Context, opts *BuildOptions) error {
-	if err := BuildImage(opts); err != nil {
-		return err
-	}
-	if !opts.Push {
+	if opts.DryRun {
+		DryRun("docker", "pull", sourceImage)
+		DryRun("docker", "tag", sourceImage, targetImage)
+		DryRun("docker", "push", targetImage)
 		return nil
 	}
 
-	if err := PushImage(opts); err != nil {
-		return err
+	// Pull the source image
+	if err := RunCMD("docker", "pull", sourceImage); err != nil {
+		return fmt.Errorf("failed to pull source image %s: %w", sourceImage, err)
 	}
 
-	// For pushes to the default branch or release tags, also push a 'latest' tag
-	shouldTagLatest := false
-	if ctx.IsProtected && ctx.RefName == ctx.DefaultBranch {
-		shouldTagLatest = true
-	} else if ctx.IsTag && !strings.Contains(ctx.RefName, "-") { // Avoids tagging pre-releases as 'latest'
-		shouldTagLatest = true
+	// Tag the image for the new environment
+	if err := RunCMD("docker", "tag", sourceImage, targetImage); err != nil {
+		return fmt.Errorf("failed to tag image %s as %s: %w", sourceImage, targetImage, err)
 	}
 
-	if shouldTagLatest {
-		imageParts := strings.Split(opts.FullImage, ":")
-		baseImage := imageParts[0]
-		latestImage := baseImage + ":latest"
-
-		fmt.Printf("Tagging %s as %s", opts.FullImage, latestImage)
-
-		if opts.DryRun {
-			DryRun("docker", "tag", opts.FullImage, latestImage)
-			DryRun("docker", "push", latestImage)
-		} else {
-			if err := RunCMD("docker", "tag", opts.FullImage, latestImage); err != nil {
-				return fmt.Errorf("failed to tag image as latest: %w", err)
-			}
-
-			fmt.Printf("Pushing latest tag: %s", latestImage)
-			if err := RunCMD("docker", "push", latestImage); err != nil {
-				return fmt.Errorf("failed to push latest image: %w", err)
-			}
-		}
+	// Push the new image tag
+	if err := PushImage(&BuildOptions{
+		FullImage: targetImage,
+		DryRun:    opts.DryRun,
+		Push:      true, // Always push promoted images
+	}); err != nil {
+		return fmt.Errorf("failed to push promoted image %s: %w", targetImage, err)
 	}
+
+	fmt.Printf("Successfully promoted image %s to %s\n", sourceImage, targetImage)
 
 	return nil
 }

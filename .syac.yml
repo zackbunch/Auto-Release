@@ -3,3 +3,5 @@ protected_branches:
   - dev
   - release
   - staging
+  - test
+  - int
