@@ -49,7 +49,7 @@ func Parse(versionStr string) (Version, error) {
 }
 
 // Inc returns a new Version incremented based on the given semantic version type
-func (v Version) Inc(bump VersionType) Version {
+func (v Version) Increment(bump VersionType) Version {
 	switch bump {
 	case Major:
 		return Version{Major: v.Major + 1, Minor: 0, Patch: 0}
@@ -60,4 +60,14 @@ func (v Version) Inc(bump VersionType) Version {
 	default:
 		return v // no change if invalid bump type
 	}
+}
+
+func (v Version) LessThan(other Version) bool {
+	if v.Major != other.Major {
+		return v.Major < other.Major
+	}
+	if v.Minor != other.Minor {
+		return v.Minor < other.Minor
+	}
+	return v.Patch < other.Patch
 }
