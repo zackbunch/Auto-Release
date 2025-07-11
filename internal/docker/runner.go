@@ -188,7 +188,7 @@ func handlePromotion(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab.Cl
 	sourceImage := fmt.Sprintf("%s:%s%s", sourceImageBasePath, sourceTagPrefix, sourceSHA[:8])
 
 	// The target image tag should be based on the target branch name and the current (merge) commit SHA
-	targetImage := fmt.Sprintf("%s:%s-%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], ctx.RefName, ctx.SHA[:8])
+	targetImage := fmt.Sprintf("%s:%s-%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], ctx.RefName, sourceSHA[:8])
 
 	fmt.Printf("Attempting to promote image from %s to %s\n", sourceImage, targetImage)
 
