@@ -132,21 +132,27 @@ func handlePromotion(ctx ci.Context, opts *BuildOptions, gitlabClient *gitlab.Cl
 	// This is the SHA we need to find the source image.
 	sourceSHA := currentCommit.ParentIDs[1]
 
-	// Determine the source image tag based on the previous environment
-	// For dev -> test, source will be rc-<sha>
-	// For test -> int, source will be test-<sha>
-	var sourceTagPrefix string
+	// Determine the source environment and image tag prefix based on the target branch
+	var sourceEnv, sourceTagPrefix string
 	switch ctx.RefName {
 	case "test":
+		// Promotion from dev -> test
+		sourceEnv = "dev"
 		sourceTagPrefix = "rc-"
 	case "int":
+		// Promotion from test -> int
+		sourceEnv = "test"
 		sourceTagPrefix = "test-"
 	default:
 		return fmt.Errorf("unsupported promotion target branch: %s", ctx.RefName)
 	}
 
-	sourceImage := fmt.Sprintf("%s:%s%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], sourceTagPrefix, sourceSHA[:8]) // Use short SHA for source tag
-	targetImage := fmt.Sprintf("%s:%s-%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], ctx.RefName, ctx.SHA[:8]) // Use short SHA for target tag
+	// Construct the full source image path using the source environment
+	sourceImageBasePath := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, sourceEnv, opts.ImageName)
+	sourceImage := fmt.Sprintf("%s:%s%s", sourceImageBasePath, sourceTagPrefix, sourceSHA[:8])
+
+	// The target image tag should be based on the target branch name and the current (merge) commit SHA
+	targetImage := fmt.Sprintf("%s:%s-%s", opts.FullImage[:strings.LastIndex(opts.FullImage, ":")], ctx.RefName, ctx.SHA[:8])
 
 	fmt.Printf("Attempting to promote image from %s to %s\n", sourceImage, targetImage)
 

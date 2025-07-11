@@ -36,7 +36,7 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 		appName = parts[len(parts)-1]
 	}
 
-	env := deriveOpenShiftEnv(ctx.RefName)
+	env := deriveOpenShiftEnv(ctx)
 	tag := generateTag(ctx)
 	fullImage := fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)
 	push := shouldPush(env, os.Getenv("SYAC_FORCE_PUSH") == "true")
@@ -53,8 +53,11 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 	}, nil
 }
 
-func deriveOpenShiftEnv(ref string) string {
-	switch ref {
+func deriveOpenShiftEnv(ctx ci.Context) string {
+	if ctx.IsTag {
+		return "prod"
+	}
+	switch ctx.RefName {
 	case "main", "master":
 		return "prod"
 	case "test":

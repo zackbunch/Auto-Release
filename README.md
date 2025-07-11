@@ -15,7 +15,7 @@ The primary goal of SYAC is to automate the Docker image building and pushing pr
     -   **Protected Branches (e.g., `main`, `release`):** Images are tagged with `CI_COMMIT_SHORT_SHA`.
     -   **Tag Pushes:** Images are tagged with the Git tag itself (e.g., `1.2.3`).
     -   **Latest Tag:** Pushes to the default branch (e.g., `main`) or new version tags will also be tagged as `latest`.
--   **Conditional Image Pushing:** Images are pushed to the registry based on the environment. By default, images for `dev` environment are not pushed unless explicitly forced (`SYAC_FORCE_PUSH=true`). Images for `prod`, `test`, `int` environments are always pushed.
+-   **Conditional Image Pushing:** Images are pushed to the registry based on the environment. By default, images for `dev`, `test`, and `int` environments are always pushed to support the promotion workflow. Images for other branches (like feature branches) are not pushed unless explicitly forced (`SYAC_FORCE_PUSH=true`).
 -   **Dry Run Capability:** Supports a dry run mode (`SYAC_DRY_RUN=true`) that logs commands without executing them, useful for debugging and verification.
 -   **Flexible Dockerfile and Build Context:** Allows specifying custom Dockerfile paths and build contexts via environment variables (`SYAC_DOCKERFILE`, `SYAC_BUILD_CONTEXT`).
 
