@@ -2,35 +2,34 @@
 
 ## 1. Overview
 
-This document outlines the CI/CD workflow and image promotion strategy for applications built with SYAC. The core principle of this workflow is **Promote the Artifact, Not the Code**. This means a single, immutable Docker image is built once for a specific change and then promoted through successive environments. This strategy ensures that the exact artifact validated by QA is the same one deployed to production, minimizing risk and ensuring consistency.
+This document outlines the CI/CD workflow and image promotion strategy for applications built with SYAC. The workflow is based on a **sprint-centric promotion model**, where the entire body of work from a development sprint is promoted through environments as a single unit.
 
-## 2. Branching Strategy
+The core principle of this workflow is **Promote the Artifact, Not the Code**. A single, immutable Docker image is built once for a specific change and then promoted through successive environments. This strategy ensures that the exact artifact validated by QA is the same one deployed to production, minimizing risk and ensuring consistency.
 
-The repository utilizes a GitFlow-like branching model to manage the flow of changes from development to production.
+## 2. Branching & Environment Strategy
 
--   **Feature Branches (`feat-*`, `feature/*`, etc.):**
-    -   All new development, bug fixes, and enhancements are done on feature branches.
-    -   These are typically short-lived and are merged into the `dev` branch upon completion.
+The repository utilizes a GitFlow-like branching model that is aligned with a time-based, sprint-centric release cycle. Each primary branch corresponds to an environment and represents the code from a specific sprint.
 
--   **`dev` Branch:**
-    -   Serves as the primary integration branch for all new features.
-    -   When code is merged into `dev`, it triggers a build of a release candidate image.
-    -   This branch is deployed to the **Dev Environment** for initial integration testing and QA validation.
+-   **`dev` Branch (Sprint `N`):**
+    -   Represents the **current, active sprint (`N`)**.
+    -   Serves as the primary integration branch for all new features and bug fixes being developed in the current sprint.
+    -   This branch is deployed to the **Dev Environment** for ongoing integration and developer testing.
 
--   **`test` Branch:**
-    -   Represents code that has been validated by QA in the dev environment.
-    -   This branch is deployed to the **Test Environment**.
-    -   Promotion to this branch is done by merging `dev` into `test`.
+-   **`test` Branch (Sprint `N-1`):**
+    -   Represents the **previous, completed sprint (`N-1`)**.
+    -   This branch is deployed to the **Test Environment**, where it is validated by the QA team throughout the current sprint.
+    -   Code is moved here from the `dev` branch during the end-of-sprint promotion event.
 
--   **`int` Branch:**
-    -   Represents a collection of features that have passed testing and are staged for production release.
-    -   This branch is deployed to the **Integration (INT) Environment** for final pre-production validation.
-    -   Promotion to this branch is done by merging `test` into `int`.
+-   **`int` Branch (Sprint `N-2`):**
+    -   Represents the code from **two sprints ago (`N-2`)**.
+    -   This branch is deployed to the **Integration (INT) Environment**.
+    -   It serves as a direct mirror of the current production environment and is the final staging gate for a release.
+    -   Code is moved here from the `test` branch during the end-of-sprint promotion event.
 
--   **`master` Branch:**
-    -   This is the production branch. It contains only code that has been fully tested and is ready for release.
-    -   Code is promoted to `master` by merging the `int` branch.
-    -   A merge to `master` is followed by the creation of a versioned Git tag, which triggers the final production build.
+-   **`master` Branch (Sprint `N-2`):**
+    -   This is the **production branch**, containing only code that has been fully tested and staged in the INT environment.
+    -   It also represents the code from **two sprints ago (`N-2`)**.
+    -   Code is moved here from the `int` branch during the end-of-sprint promotion event, which triggers the production release.
 
 ## 3. Image Tagging Strategy
 
@@ -39,80 +38,71 @@ SYAC uses an intelligent tagging strategy to identify and track images as they m
 -   **Release Candidate Tag (`rc-<sha>`):**
     -   Used for images built from the `dev` branch.
     -   Example: `myapp:rc-a1b2c3d`
-    -   The short commit SHA provides a unique, traceable identifier for the exact code change that was built.
+    -   The short commit SHA provides a unique, traceable identifier for each change.
+
+-   **Environment Tags (`test-<sha>`, `int-<sha>`):**
+    -   Used for images that have been promoted to the `test` and `int` environments.
+    -   These are created by re-tagging a validated image from the previous environment.
 
 -   **Version Tag (`X.Y.Z`):**
     -   Used for production releases.
     -   Example: `myapp:1.2.3`
-    -   This tag is created from a Git tag on the `master` branch.
+    -   This tag is created from a Git tag on the `master` branch, which is generated automatically upon merging from `int`.
 
 -   **Latest Tag (`latest`):**
     -   A floating tag that always points to the most recent production release image.
     -   It is created and pushed alongside the version tag.
 
-## 4. The Promotion Workflow
+## 4. The End-of-Sprint Promotion Workflow
 
-This section details the step-by-step process of moving a change from a feature branch to production.
+The promotion of code is a coordinated event that occurs at the conclusion of each sprint. This event involves a cascade of merges from `dev` down to `master`.
 
 ```mermaid
 flowchart TD
-    subgraph "Feature Development"
-        A[Feature Branch] --> B{Merge to dev};
+    subgraph "Sprint N (Active Development)"
+        DevBranch[DEV Branch] --> DevEnv(DEV Environment);
     end
 
-    subgraph "Dev Environment"
-        B --> C[Build Image<br>Tag: rc-sha];
-        C --> D{Deploy to Dev};
-        D --> E[QA Validation];
+    subgraph "Sprint N-1 (QA Validation)"
+        TestBranch[TEST Branch] --> TestEnv(TEST Environment);
     end
 
-    subgraph "Test Environment"
-        E -- Approved --> F{Merge dev to test};
-        F --> G[Promote Image<br>Re-tag rc-sha as test-sha];
-        G --> H{Deploy to Test};
+    subgraph "Sprint N-2 (Staging & Production)"
+        IntBranch[INT Branch] --> IntEnv(INT Environment);
+        MasterBranch[MASTER Branch] --> ProdEnv(PROD Environment);
     end
 
-    subgraph "INT Environment"
-        H --> I{Merge test to int};
-        I --> J[Promote Image<br>Re-tag test-sha as int-sha];
-        J --> K{Deploy to INT};
+    subgraph "End-of-Sprint Promotion Event"
+        EndOfSprint{End of Sprint N};
+        P1[1. Merge dev to test];
+        P2[2. Merge test to int];
+        P3[3. Merge int to master];
+        
+        EndOfSprint --> P1 --> P2 --> P3;
     end
 
-    subgraph "Production Release"
-        K --> L{Merge int to master};
-        L --> M[Create Git Tag<br>e.g., v1.2.3];
-        M --> N[Build Image<br>Tags: 1.2.3, latest];
-        N --> O{Deploy to Prod};
-    end
+    P1 ==>|Promotes Artifact| TestBranch;
+    P2 ==>|Promotes Artifact| IntBranch;
+    P3 ==>|Triggers Release| MasterBranch;
 ```
 
-### Step 1: Feature Development and Merge to `dev`
+### Step 1: Promotion from `dev` to `test`
 
-1.  A developer creates a feature branch and implements their changes.
-2.  Once complete, they open a merge request to merge the feature branch into `dev`.
-3.  Upon merging, the GitLab CI pipeline for the `dev` branch triggers.
-4.  **Action:** `syac` builds a new Docker image.
-5.  **Result:** The image is tagged `rc-<commit-sha>` and pushed to the container registry. It is then automatically deployed to the **Dev Environment**.
+1.  **Action:** At the end of Sprint `N`, the `dev` branch (containing all of the sprint's work) is merged into the `test` branch.
+2.  **Automation:** The merge triggers the `syac` promotion pipeline. It identifies the `rc-<sha>` images associated with the commits from `dev`, re-tags them for the `test` environment, and deploys them.
+3.  **Result:** The **Test Environment** now runs the code for Sprint `N`. The QA team can begin their validation cycle for this sprint's work.
 
-### Step 2: Promotion from `dev` to `test`
+### Step 2: Promotion from `test` to `int`
 
-1.  The QA team validates the changes in the **Dev Environment**.
-2.  Once approved, a merge request is opened to merge the `dev` branch into the `test` branch.
-3.  Upon merging, the GitLab CI pipeline for the `test` branch triggers.
-4.  **Action:** The pipeline **does not build a new image**. Instead, a promotion script runs.
-5.  **Result:** The script identifies the `rc-<commit-sha>` image from the merge, re-tags it for the test environment, and pushes the new tag. The re-tagged image is then deployed to the **Test Environment**.
+1.  **Action:** Immediately following the first promotion, the `test` branch (which held the code for Sprint `N-1`) is merged into the `int` branch.
+2.  **Automation:** The pipeline promotes the validated `test` artifacts to the `int` environment.
+3.  **Result:** The **INT Environment** now runs the code for Sprint `N-1`, making it the new official release candidate.
 
-### Step 3: Promotion from `test` to `int`
+### Step 3: Release to Production
 
-1.  The process mirrors the promotion from dev to test.
-2.  After validation in the **Test Environment**, the `test` branch is merged into the `int` branch.
-3.  **Action:** The `int` branch pipeline re-tags the existing, validated image.
-4.  **Result:** The re-tagged image is deployed to the **Integration (INT) Environment** for final, pre-production checks.
-
-### Step 4: Release to Production
-
-1.  When the `int` branch is stable and ready for release, it is merged into the `master` branch.
-2.  Immediately following the merge, a release manager creates a new, versioned Git tag (e.g., `v1.2.3`) on the `master` branch.
-3.  The creation of this new tag triggers the final production pipeline.
-4.  **Action:** `syac` builds a new, clean image from the production code.
-5.  **Result:** The image is tagged with both the version number (`1.2.3`) and `latest`. It is pushed to the registry and deployed to the **Production Environment**.
+1.  **Action:** Finally, the `int` branch (which held the code for Sprint `N-2`) is merged into the `master` branch.
+2.  **Automation:**
+    -   This merge triggers a specialized `create_api_release` job.
+    -   The job reads the version bump information from the merge request, calculates the next semantic version (e.g., `v1.3.0`), and calls the GitLab API to create a formal Release and its corresponding Git tag.
+    -   The new tag triggers the final `syac` pipeline.
+3.  **Result:** `syac` builds a clean, final image from the tag, tags it with the version number and `latest`, and pushes it to the production registry. The **Production Environment** is then updated with the code from Sprint `N-2`.
