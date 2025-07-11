@@ -26,6 +26,8 @@ func Execute(ctx ci.Context, gitlabClient *gitlab.Client) error { // Modified si
 		return buildAndPush(ctx, opts)
 	case ctx.RefName == "test" || ctx.RefName == "int": // Handle promotion for test and int
 		return handlePromotion(ctx, opts, gitlabClient)
+	case ctx.RefName == "master":
+		return handleMasterMerge(ctx, gitlabClient)
 	case ctx.IsProtected:
 		return handleProtectedBranch(ctx, opts)
 	case ctx.IsFeatureBranch:
@@ -112,6 +114,40 @@ func buildAndPush(ctx ci.Context, opts *BuildOptions) error {
 		}
 	}
 
+	return nil
+}
+
+func handleMasterMerge(ctx ci.Context, gitlabClient *gitlab.Client) error {
+	fmt.Println("Merge to master detected. Creating release...")
+
+	// Get the merge request associated with the commit
+	mr, err := gitlabClient.MergeRequests.GetMergeRequestForCommit(ctx.SHA)
+	if err != nil {
+		return fmt.Errorf("failed to get merge request for commit %s: %w", ctx.SHA, err)
+	}
+
+	// Get the version bump type from the merge request description
+	bumpType, err := gitlabClient.MergeRequests.GetVersionBump(fmt.Sprintf("%d", mr.IID))
+	if err != nil {
+		return fmt.Errorf("failed to get version bump from MR %d: %w", mr.IID, err)
+	}
+
+	// Get the next version
+	_, nextVersion, err := gitlabClient.Tags.GetNextVersion(bumpType)
+	if err != nil {
+		return fmt.Errorf("failed to get next version: %w", err)
+	}
+
+	tagName := fmt.Sprintf("v%s", nextVersion.String())
+	releaseName := fmt.Sprintf("Release %s", tagName)
+	releaseDescription := fmt.Sprintf("Automated release for merge request !%d: %s", mr.IID, mr.Title)
+
+	// Create the release
+	if err := gitlabClient.Releases.CreateRelease(tagName, ctx.SHA, releaseName, releaseDescription); err != nil {
+		return fmt.Errorf("failed to create release: %w", err)
+	}
+
+	fmt.Printf("Successfully created release %s\n", tagName)
 	return nil
 }
 

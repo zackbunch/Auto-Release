@@ -15,6 +15,7 @@ type MergeRequestsService interface {
 	CreateMergeRequestComment(mrID string) error
 	GetMergeRequestNotes(mrID string) ([]MergeRequestNote, error)
 	GetVersionBump(mrID string) (version.VersionType, error)
+	GetMergeRequestForCommit(sha string) (MergeRequest, error)
 }
 
 // mrsService is a concrete implementation of MergeRequestsService.
@@ -107,4 +108,23 @@ func (s *mrsService) GetVersionBump(mrID string) (version.VersionType, error) {
 	}
 
 	return bumpType, nil
+}
+
+func (s *mrsService) GetMergeRequestForCommit(sha string) (MergeRequest, error) {
+	path := fmt.Sprintf("/projects/%s/repository/commits/%s/merge_requests", urlEncode(s.client.projectID), sha)
+	respData, err := s.client.DoRequest("GET", path, nil)
+	if err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to get merge requests for commit %s: %w", sha, err)
+	}
+
+	var mrs []MergeRequest
+	if err := json.Unmarshal(respData, &mrs); err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to unmarshal merge requests: %w", err)
+	}
+
+	if len(mrs) == 0 {
+		return MergeRequest{}, fmt.Errorf("no merge request found for commit %s", sha)
+	}
+
+	return mrs[0], nil
 }

@@ -23,7 +23,8 @@ type Client struct {
 	// Services
 	MergeRequests MergeRequestsService
 	Tags          TagsService
-	Commits       CommitsService // New service
+	Commits       CommitsService
+	Releases      ReleasesService // New service
 }
 
 // GitLabError represents an error response from the GitLab API.
@@ -98,7 +99,8 @@ func NewClient() (*Client, error) {
 	// Initialize services
 	c.MergeRequests = &mrsService{client: c}
 	c.Tags = &tagsService{client: c}
-	c.Commits = &commitsService{client: c} // Initialize new service
+	c.Commits = &commitsService{client: c}
+	c.Releases = &releasesService{client: c} // Initialize new service
 
 	return c, nil
 }
