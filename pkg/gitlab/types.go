@@ -7,3 +7,8 @@ type MergeRequestNote struct {
 type Tag struct {
 	Name string `json:"name"`
 }
+
+type MergeRequest struct {
+	IID   int    `json:"iid"`
+	Title string `json:"title"`
+}

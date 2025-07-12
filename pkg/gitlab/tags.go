@@ -55,7 +55,8 @@ func (s *tagsService) GetLatestTag() (version.Version, error) {
 	}
 
 	if len(parsedVersions) == 0 {
-		return version.Version{}, fmt.Errorf("no valid semantic version tags found")
+		// If no valid semantic version tags are found, start from 0.0.0
+		return version.Version{Major: 0, Minor: 0, Patch: 0}, nil
 	}
 
 	sort.Slice(parsedVersions, func(i, j int) bool {
@@ -93,14 +94,9 @@ func (s *tagsService) CreateTag(tagName, ref, message string) error {
 }
 
 func (s *tagsService) GetNextVersion(bump version.VersionType) (version.Version, version.Version, error) {
-	latestTagStr, err := s.GetLatestTag()
+	current, err := s.GetLatestTag()
 	if err != nil {
 		return version.Version{}, version.Version{}, fmt.Errorf("failed to get latest tag: %w", err)
-	}
-
-	current, err := version.Parse(latestTagStr.String())
-	if err != nil {
-		return version.Version{}, version.Version{}, fmt.Errorf("failed to get parse latest version: %w", err)
 	}
 
 	next := current.Increment(bump)

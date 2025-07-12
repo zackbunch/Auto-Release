@@ -17,6 +17,11 @@ func BuildImage(opts *BuildOptions) error {
 
 	args = append(args, opts.ContextPath)
 
+	if opts.DryRun {
+		DryRun("docker", args...)
+		return nil
+	}
+
 	fmt.Printf("Building image: %s\n", opts.FullImage)
 	return RunCMD("docker", args...)
 }

@@ -14,9 +14,6 @@ import (
 	"time"
 )
 
-// Client represents a GitLab API client.
-// It holds the base URL, authentication token, HTTP client, and the project ID
-// for project-scoped API calls. It also exposes various GitLab API services.
 type Client struct {
 	baseURL    string
 	token      string
@@ -26,6 +23,8 @@ type Client struct {
 	// Services
 	MergeRequests MergeRequestsService
 	Tags          TagsService
+	Commits       CommitsService
+	Releases      ReleasesService // New service
 }
 
 // GitLabError represents an error response from the GitLab API.
@@ -41,10 +40,11 @@ func (e *GitLabError) Error() string {
 }
 
 // NewClient creates a new GitLab client using environment variables for configuration.
-// It supports both GitLab CI pipeline mode and local development mode.
+// It expects a Personal Access Token or Project Access Token.
 // Required environment variables:
-//   - CI mode: GITLAB_CI=true, CI_API_V4_URL, CI_JOB_TOKEN (or SYAC_TOKEN), CI_PROJECT_ID
-//   - Local mode: GITLAB_BASE_URL, GITLAB_API_TOKEN, GITLAB_PROJECT_ID
+//   - SYAC_GITLAB_API_TOKEN (preferred) or GITLAB_API_TOKEN
+//   - CI_API_V4_URL (if running in CI) or GITLAB_BASE_URL (if running locally)
+//   - CI_PROJECT_ID (if running in CI) or GITLAB_PROJECT_ID (if running locally)
 //
 // An optional GITLAB_CLIENT_TIMEOUT_SECONDS can be set to configure the HTTP client timeout.
 func NewClient() (*Client, error) {
@@ -52,25 +52,23 @@ func NewClient() (*Client, error) {
 
 	isPipeline := os.Getenv("GITLAB_CI") == "true"
 
+	// Prioritize SYAC_GITLAB_API_TOKEN
+	token = os.Getenv("SYAC_GITLAB_API_TOKEN")
+	if token == "" {
+		// Fallback to GITLAB_API_TOKEN
+		token = os.Getenv("GITLAB_API_TOKEN")
+	}
+
 	if isPipeline {
 		baseURL = strings.TrimSuffix(os.Getenv("CI_API_V4_URL"), "/api/v4")
-		token = os.Getenv("CI_JOB_TOKEN")
-		if token == "" {
-			// Optional fallback for impersonation token
-			token = os.Getenv("SYAC_TOKEN")
-		}
 		projectID = os.Getenv("CI_PROJECT_ID")
 	} else {
 		baseURL = os.Getenv("GITLAB_BASE_URL")
-		token = os.Getenv("GITLAB_API_TOKEN")
 		projectID = os.Getenv("GITLAB_PROJECT_ID")
 	}
 
 	if token == "" {
-		if isPipeline {
-			return nil, errors.New("CI_JOB_TOKEN or SYAC_TOKEN must be set in CI mode")
-		}
-		return nil, errors.New("GITLAB_API_TOKEN must be set in local mode")
+		return nil, errors.New("SYAC_GITLAB_API_TOKEN or GITLAB_API_TOKEN must be set")
 	}
 
 	if projectID == "" {
@@ -101,6 +99,8 @@ func NewClient() (*Client, error) {
 	// Initialize services
 	c.MergeRequests = &mrsService{client: c}
 	c.Tags = &tagsService{client: c}
+	c.Commits = &commitsService{client: c}
+	c.Releases = &releasesService{client: c} // Initialize new service
 
 	return c, nil
 }
