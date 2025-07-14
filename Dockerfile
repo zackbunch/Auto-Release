@@ -21,6 +21,7 @@ RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o /syac
 # --- Final Stage ---
 # This stage creates the final, lightweight image.
 FROM alpine:latest
+RUN apk add --no-cache docker-cli
 
 # Copy the compiled binary from the builder stage.
 COPY --from=builder /syac /usr/local/bin/syac
