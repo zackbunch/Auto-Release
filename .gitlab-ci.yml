@@ -1,0 +1,122 @@
+# This GitLab CI/CD pipeline uses the syac CLI to automate the workflow
+# described in CONOPS.md.
+
+# --- CI/CD Variables ---
+# For this pipeline to work, you MUST configure the following CI/CD variables
+# in your GitLab project settings (Settings > CI/CD > Variables):
+#
+# 1. GITLAB_TOKEN: A project access token with `api` and `write_repository` scopes.
+#    This is required for the `syac release` command to create tags and releases.
+#
+# 2. CI_REGISTRY_USER: The username for the container registry.
+#
+# 3. CI_REGISTRY_PASSWORD: The password or access token for the container registry.
+#
+# 4. SYAC_APPLICATION_NAME: The name of the application being built (e.g., "my-app").
+#
+# 5. SYAC_REGISTRY_IMAGE: The base path for the image in the registry 
+#    (e.g., "registry.example.com/group/project").
+
+variables:
+  # Instructs Docker to use the overlay2 storage driver, which is recommended for Docker-in-Docker.
+  DOCKER_DRIVER: overlay2
+  # Enables Docker-in-Docker communication over TLS.
+  DOCKER_TLS_CERTDIR: "/certs"
+
+stages:
+  - setup
+  - build
+  - promote
+  - release
+
+# This job compiles the syac binary, which is then used by all other jobs in the pipeline.
+build_binary:
+  stage: setup
+  image: golang:1.24
+  script:
+    - go build -o syac .
+  artifacts:
+    paths:
+      - syac
+    expire_in: 1 hour
+
+# This job is the foundation for all jobs that need to run Docker commands.
+# It uses the official Docker-in-Docker (dind) image and service.
+.docker_job:
+  image: docker:24.0.5
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  dependencies:
+    - build_binary
+  before_script:
+    # Make the compiled syac binary executable.
+    - chmod +x syac
+    # Log in to the GitLab container registry.
+    - ./syac docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+# --- Build Stage ---
+
+# Builds a release candidate (RC) image from the `dev` branch.
+build_rc:
+  extends: .docker_job
+  stage: build
+  script:
+    - ./syac build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+
+# Builds the final, version-tagged production image when a new Git tag is pushed.
+build_release_image:
+  extends: .docker_job
+  stage: build
+  script:
+    - ./syac build
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# --- Promote Stage ---
+
+# Promotes an image from the `dev` environment to the `test` environment.
+# This job runs when a merge to the `test` branch occurs.
+promote_to_test:
+  extends: .docker_job
+  stage: promote
+  script:
+    - ./syac promote --from dev --to test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "test"
+
+# Promotes an image from the `test` environment to the `int` environment.
+# This job runs when a merge to the `int` branch occurs.
+promote_to_int:
+  extends: .docker_job
+  stage: promote
+  script:
+    - ./syac promote --from test --to int
+  rules:
+    - if: $CI_COMMIT_BRANCH == "int"
+
+# --- Release Stage ---
+
+# Creates a new Git tag and GitLab Release.
+# This job runs when a merge to the `master` branch occurs.
+create_release:
+  stage: release
+  image: golang:1.24 # Using Go image as it has git and other tools.
+  dependencies:
+    - build_binary
+  before_script:
+    - chmod +x syac
+  script:
+    - |
+      BUMP_TYPE="patch"
+      if [[ "$CI_COMMIT_MESSAGE" == *"[release:major]"* ]]; then
+        BUMP_TYPE="major"
+      elif [[ "$CI_COMMIT_MESSAGE" == *"[release:minor]"* ]]; then
+        BUMP_TYPE="minor"
+      fi
+      echo "Creating a $BUMP_TYPE release..."
+    - ./syac release --bump $BUMP_TYPE
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
