@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"syac/internal/version"
 	"syac/pkg/gitlab"
+
+	"github.com/spf13/cobra"
 )
 
 var releaseCmd = &cobra.Command{
