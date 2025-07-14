@@ -84,6 +84,28 @@ build_and_push_syac_branch_image:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
       when: on_success
 
+# This job builds and publishes the syac container image for development branches (e.g., dev).
+# It tags the image with the branch name and also as 'latest'.
+build_and_push_syac_dev_branch_image:
+  stage: publish
+  image: docker:24.0.5
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    # Build the syac image, tagging it with the branch slug.
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
+    # Push the image with the branch slug tag.
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+    # Also tag the image as 'latest'.
+    - docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" "$CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "cli-cobra"
+      when: on_success
+
 # This job is the foundation for all jobs that need to run Docker commands.
 # It uses the official Docker-in-Docker (dind) image and service.
 .docker_job:
