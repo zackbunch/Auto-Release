@@ -26,4 +26,4 @@ FROM alpine:latest
 COPY --from=builder /syac /usr/local/bin/syac
 
 # Set the entrypoint for the container. When the container runs, it will execute the syac binary.
-ENTRYPOINT ["syac"]
+
