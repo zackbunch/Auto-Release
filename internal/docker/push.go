@@ -6,6 +6,11 @@ import (
 )
 
 func PushImage(opts *BuildOptions) error {
+	if !opts.Push && !opts.DryRun {
+		// If not set to push and not a dry run, do nothing.
+		return nil
+	}
+
 	if opts.DryRun {
 		DryRun("docker", "login", "-u", "<redacted>", "-p", "<redacted>", os.Getenv("CI_REGISTRY"))
 		DryRun("docker", "push", opts.FullImage)

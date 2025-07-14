@@ -1,0 +1,134 @@
+# This is a sample .gitlab-ci.yml for an application that consumes the syac CLI container.
+# Replace `your-registry/syac/syac` with the actual path to your syac image.
+
+include:
+  - template: Container-Scanning.gitlab-ci.yml
+
+image: your-registry/syac/syac:latest
+
+variables:
+  # These variables would be specific to the application using syac.
+  # They should be configured in the application's GitLab project settings.
+  SYAC_APPLICATION_NAME: "my-awesome-app"
+  SYAC_REGISTRY_IMAGE: "your-registry/my-awesome-app"
+
+  # Docker-in-Docker configuration (required for building/pushing images)
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+
+stages:
+  - build
+  - test
+  - promote
+  - deploy
+
+# --- Build Stage ---
+# This job builds the application's Docker image.
+# It runs on the 'dev' branch, creating a release candidate image.
+build_app_image:
+  stage: build
+  # The syac container includes Docker, so we can use it directly.
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  before_script:
+    # Login to the container registry using variables from the consuming project.
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    # Use the syac build command. It will automatically pick up environment variables
+    # like SYAC_APPLICATION_NAME, SYAC_REGISTRY_IMAGE, CI_COMMIT_SHORT_SHA, etc.
+    - syac build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+  environment:
+    name: dev
+
+# --- Test Stage ---
+# This job would run tests against the built image.
+# (Placeholder - actual test commands would go here)
+run_tests:
+  stage: test
+  image: alpine/git:latest # A simple image for demonstration, replace with your test runner
+  script:
+    - echo "Running tests for $SYAC_APPLICATION_NAME..."
+    - echo "Tests passed!"
+    # Example: If your tests generate a JUnit XML report
+    - mkdir -p test_results
+    - echo "<testsuite name=\"ExampleTests\"><testcase name=\"test1\"/></testsuite>" > test_results/junit.xml
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+  artifacts:
+    when: always
+    paths:
+      - test_results/
+    reports:
+      junit: test_results/junit.xml
+
+# --- Promote Stage ---
+# These jobs promote the image through environments as per CONOPS.md.
+# They are triggered by merges to the respective branches.
+
+promote_to_test:
+  stage: promote
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - syac promote --from dev --to test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "test"
+  environment:
+    name: test
+  variables:
+    # Define the image to be scanned for the test environment
+    CONTAINER_SCANNING_TARGET_IMAGE: "$SYAC_REGISTRY_IMAGE/test/$SYAC_APPLICATION_NAME:$CI_COMMIT_SHORT_SHA"
+  needs:
+    - job: container_scanning
+      artifacts: false # We don't need artifacts from the scanning job for promotion
+
+promote_to_int:
+  stage: promote
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - syac promote --from test --to int
+  rules:
+    - if: $CI_COMMIT_BRANCH == "int"
+  environment:
+    name: int
+  variables:
+    # Define the image to be scanned for the int environment
+    CONTAINER_SCANNING_TARGET_IMAGE: "$SYAC_REGISTRY_IMAGE/int/$SYAC_APPLICATION_NAME:$CI_COMMIT_SHORT_SHA"
+  needs:
+    - job: container_scanning
+      artifacts: false # We don't need artifacts from the scanning job for promotion
+
+# --- Deploy Stage ---
+# This job triggers the final release and deployment to production.
+# It runs on merges to the 'master' branch.
+create_release_and_deploy:
+  stage: deploy
+  # The syac container is used here as it contains the GitLab API client.
+  script:
+    - |
+      # Determine the bump type from the commit message (e.g., [release:major])
+      BUMP_TYPE="patch"
+      if [[ "$CI_COMMIT_MESSAGE" == *"[release:major]"* ]]; then
+        BUMP_TYPE="major"
+      elif [[ "$CI_COMMIT_MESSAGE" == *"[release:minor]"* ]]; then
+        BUMP_TYPE="minor"
+      fi
+      echo "Creating a $BUMP_TYPE release for $SYAC_APPLICATION_NAME..."
+    # The syac release command will create the Git tag and GitLab release.
+    # This will then trigger the 'build_release_image' job in the syac project's pipeline.
+    - syac release --bump $BUMP_TYPE
+    - echo "Deployment to production triggered by release tag."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+  environment:
+    name: production
