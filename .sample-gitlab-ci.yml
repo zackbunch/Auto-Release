@@ -52,8 +52,17 @@ run_tests:
   script:
     - echo "Running tests for $SYAC_APPLICATION_NAME..."
     - echo "Tests passed!"
+    # Example: If your tests generate a JUnit XML report
+    - mkdir -p test_results
+    - echo "<testsuite name=\"ExampleTests\"><testcase name=\"test1\"/></testsuite>" > test_results/junit.xml
   rules:
     - if: $CI_COMMIT_BRANCH == "dev"
+  artifacts:
+    when: always
+    paths:
+      - test_results/
+    reports:
+      junit: test_results/junit.xml
 
 # --- Promote Stage ---
 # These jobs promote the image through environments as per CONOPS.md.
@@ -75,6 +84,9 @@ promote_to_test:
   variables:
     # Define the image to be scanned for the test environment
     CONTAINER_SCANNING_TARGET_IMAGE: "$SYAC_REGISTRY_IMAGE/test/$SYAC_APPLICATION_NAME:$CI_COMMIT_SHORT_SHA"
+  needs:
+    - job: container_scanning
+      artifacts: false # We don't need artifacts from the scanning job for promotion
 
 promote_to_int:
   stage: promote
@@ -92,6 +104,9 @@ promote_to_int:
   variables:
     # Define the image to be scanned for the int environment
     CONTAINER_SCANNING_TARGET_IMAGE: "$SYAC_REGISTRY_IMAGE/int/$SYAC_APPLICATION_NAME:$CI_COMMIT_SHORT_SHA"
+  needs:
+    - job: container_scanning
+      artifacts: false # We don't need artifacts from the scanning job for promotion
 
 # --- Deploy Stage ---
 # This job triggers the final release and deployment to production.
