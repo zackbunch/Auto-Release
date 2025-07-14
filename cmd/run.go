@@ -13,7 +13,12 @@ import (
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run the CI/CD pipeline",
+	Short: "Executes the full SYAC CI/CD pipeline (legacy command).",
+	Long: `The run command executes the entire SYAC CI/CD pipeline as a single, monolithic operation.
+
+This command is primarily for backward compatibility. For more granular control and
+modern pipeline integration, it is recommended to use the 'build', 'promote', and 'release'
+commands individually within your CI/CD configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := ci.LoadEnvFileFromFlag(os.Args); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to load env: %v\n", err)

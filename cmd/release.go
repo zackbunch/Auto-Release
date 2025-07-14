@@ -12,7 +12,15 @@ import (
 
 var releaseCmd = &cobra.Command{
 	Use:   "release",
-	Short: "Create a new release",
+	Short: "Creates a new Git tag and GitLab release based on semantic versioning.",
+	Long: `The release command automates the creation of a new semantic version tag
+(e.g., v1.2.3) and a corresponding GitLab release.
+
+It determines the next version based on the specified bump type (major, minor, or patch)
+and interacts with the GitLab API to create the tag and release entry.
+
+This command is typically used as the final step in the promotion pipeline
+to mark a production-ready artifact.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		bump, _ := cmd.Flags().GetString("bump")
 

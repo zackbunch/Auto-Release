@@ -11,7 +11,15 @@ import (
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "Build a Docker image",
+	Short: "Builds a Docker image based on CI context and SYAC configuration.",
+	Long: `The build command constructs a Docker image using parameters derived from
+the CI environment variables and SYAC's internal configuration.
+
+It automatically determines the image name, tag (e.g., rc-<sha> for dev branch),
+Dockerfile path, and build context.
+
+This command is typically used early in the CI pipeline to create the initial
+immutable artifact.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, err := ci.LoadContext()
 		if err != nil {

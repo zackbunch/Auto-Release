@@ -11,7 +11,14 @@ import (
 
 var promoteCmd = &cobra.Command{
 	Use:   "promote",
-	Short: "Promote a Docker image to a new environment",
+	Short: "Promotes a Docker image from one environment to another by re-tagging and pushing.",
+	Long: `The promote command facilitates the movement of an immutable Docker image
+through the defined environments (e.g., dev -> test, test -> int).
+
+It re-tags an existing image from a source environment's tag to a target
+environment's tag and pushes the newly tagged image to the container registry.
+
+This command embodies the "Promote the Artifact, Not the Code" principle.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fromEnv, _ := cmd.Flags().GetString("from")
 		toEnv, _ := cmd.Flags().GetString("to")

@@ -9,13 +9,16 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "syac",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "SYAC (Sprint-Yielded Artifact Control) automates CI/CD workflows and image promotion.",
+	Long: `SYAC (Sprint-Yielded Artifact Control) is a command-line tool designed to automate
+CI/CD workflows and Docker image promotion based on a sprint-centric model.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+It implements the "Promote the Artifact, Not the Code" principle, ensuring
+that a single, immutable Docker image is built once and then promoted
+through successive environments (dev, test, int, production).
+
+SYAC provides commands for building, promoting, and releasing Docker images,
+integrating with GitLab for versioning and release management.`,
 }
 
 func Execute() {
