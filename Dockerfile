@@ -1,12 +1,29 @@
-# syntax=docker/dockerfile:1
+# --- Build Stage ---
+# This stage compiles the Go application.
+FROM golang:1.24-alpine AS builder
 
-FROM alpine:3.19
+# Set the working directory inside the container.
+WORKDIR /app
 
-LABEL maintainer="zack"
-LABEL description="Simple test container for SYAC image builds"
+# Copy the Go module files and download dependencies.
+# This is done as a separate step to leverage Docker layer caching.
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Create a dummy application
-RUN echo -e '#!/bin/sh\\necho \"Hello from SYAC test image!\"' > /hello.sh && \
-    chmod +x /hello.sh
+# Copy the rest of the application source code.
+COPY . .
 
-ENTRYPOINT ["/hello.sh"]
+# Build the application, creating a static binary.
+# CGO_ENABLED=0 is important for creating a static binary that can run in a minimal container.
+# -ldflags "-w -s" strips debugging information, reducing the binary size.
+RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o /syac
+
+# --- Final Stage ---
+# This stage creates the final, lightweight image.
+FROM alpine:latest
+
+# Copy the compiled binary from the builder stage.
+COPY --from=builder /syac /usr/local/bin/syac
+
+# Set the entrypoint for the container. When the container runs, it will execute the syac binary.
+ENTRYPOINT ["syac"]
