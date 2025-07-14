@@ -33,7 +33,7 @@ build_app_image:
       alias: docker
   before_script:
     # Login to the container registry using variables from the consuming project.
-    - syac docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     # Use the syac build command. It will automatically pick up environment variables
     # like SYAC_APPLICATION_NAME, SYAC_REGISTRY_IMAGE, CI_COMMIT_SHORT_SHA, etc.
@@ -74,7 +74,7 @@ promote_to_test:
     - name: docker:24.0.5-dind
       alias: docker
   before_script:
-    - syac docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - syac promote --from dev --to test
   rules:
@@ -94,7 +94,7 @@ promote_to_int:
     - name: docker:24.0.5-dind
       alias: docker
   before_script:
-    - syac docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - syac promote --from test --to int
   rules:

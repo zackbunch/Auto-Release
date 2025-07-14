@@ -119,7 +119,7 @@ build_and_push_syac_dev_branch_image:
     # Make the compiled syac binary executable.
     - chmod +x syac
     # Log in to the GitLab container registry.
-    - ./syac docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
 
 # --- Build Stage ---
 
@@ -183,6 +183,6 @@ create_release:
         BUMP_TYPE="minor"
       fi
       echo "Creating a $BUMP_TYPE release..."
-    - ./syac release --bump $BUMP_TYPE
+    - /usr/local/bin/syac release --bump $BUMP_TYPE
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
