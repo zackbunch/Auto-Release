@@ -36,7 +36,12 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 	tag := ctx.ShortSHA
 	env := deriveOpenShiftEnv(ctx)
 
-	fullImage := fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)
+	var fullImage string
+	if ctx.IsFeatureBranch {
+		fullImage = fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, ctx.RefName, tag)
+	} else {
+		fullImage = fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)
+	}
 
 	return &BuildOptions{
 		Dockerfile:     dockerfile,
@@ -53,6 +58,9 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 func deriveOpenShiftEnv(ctx ci.Context) string {
 	if ctx.IsTag {
 		return "prod"
+	}
+	if ctx.IsFeatureBranch {
+		return "development"
 	}
 	switch ctx.RefName {
 	case "main", "master":
