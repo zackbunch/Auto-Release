@@ -1,0 +1,29 @@
+# .goreleaser.yml
+project_name: syac
+
+builds:
+  - id: syac
+    main: ./cmd/main.go
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - "-s -w -X github.com/zackbunch/syac/cmd.Version={{.Version}}"
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  disable: true # Disable GitHub releases since you're using GitLab
