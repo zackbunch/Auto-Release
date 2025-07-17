@@ -57,7 +57,8 @@ build_feature:
     - ./syac context
   script:
     - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
-    - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
+    - ./syac build
+    # - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
 
 # -----------------------------------------------------------------------------
 # 2) RC build on MR → dev
