@@ -49,7 +49,7 @@ build_feature:
   dependencies:
     - build_binary
   rules:
-    - if: "$CI_COMMIT_REF_NAME =~ /^gm-$/"
+    - if: '$CI_COMMIT_REF_NAME =~ /^gm-[0-9]+$/'
       when: always
     - when: never
   before_script:
