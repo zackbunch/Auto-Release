@@ -79,21 +79,6 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Feature Branch        : %t\n", c.IsFeatureBranch)
 	fmt.Printf("  Force Push            : %t\n", c.ForcePush)
 	fmt.Printf("  Application Name      : %s\n", c.ApplicationName)
-
-	// Add protected branches
-	protectedBranches, err := client.Branches.ListProtectedBranches()
-	if err != nil {
-		fmt.Printf("  Protected Branches    : Error fetching protected branches: %v\n", err)
-	} else if len(protectedBranches) > 0 {
-		fmt.Println("  Protected Branches    :")
-		for _, branch := range protectedBranches {
-			fmt.Printf("    - %s\n", branch.Name)
-		}
-	} else {
-		fmt.Println("  Protected Branches    : None found")
-	}
-
-	fmt.Println()
 }
 
 func (c Context) describeContext() string {
