@@ -58,7 +58,7 @@ build_feature:
   script:
     - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
     - ./syac build
-    - ./syac push
+    - ./syac push --dry-run
     # - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
 
 # -----------------------------------------------------------------------------
