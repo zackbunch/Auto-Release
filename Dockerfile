@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Copy the Go module files and download dependencies.
 # This is done as a separate step to leverage Docker layer caching.
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the rest of the application source code.

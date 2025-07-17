@@ -11,8 +11,8 @@
 *.out
 
 # Go modules
-/go.sum
-/go.work.sum
+# /go.sum
+# /go.work.sum
 
 # IDE/editor configs
 .vscode/
