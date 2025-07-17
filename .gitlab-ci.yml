@@ -27,10 +27,14 @@ build_binary:
   script:
     # Build a statically-linked binary to ensure it runs in the minimal Docker container.
     - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
+  after_script:
+    - chmod +x syac
+    - ./syac context
   artifacts:
     paths:
       - syac
     expire_in: 1 hour
+
 
 
 # -----------------------------------------------------------------------------

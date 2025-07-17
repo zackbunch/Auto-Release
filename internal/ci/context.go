@@ -44,7 +44,7 @@ func LoadContext() (Context, error) {
 		Sprint:          os.Getenv("SYAC_SPRINT"),
 		IsMergeRequest:  os.Getenv("CI_PIPELINE_SOURCE") == "merge_request_event",
 		IsTag:           tag != "",
-		IsFeatureBranch: strings.HasPrefix(ref, "gmarm-"),
+		IsFeatureBranch: strings.HasPrefix(ref, "gm-"),
 		IsDefaultBranch: ref == defaultBranch,
 		ForcePush:       os.Getenv("SYAC_FORCE_PUSH") == "true",
 		ApplicationName: func() string {
