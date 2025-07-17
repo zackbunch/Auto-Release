@@ -25,6 +25,7 @@ type Client struct {
 	Tags          TagsService
 	Commits       CommitsService
 	Releases      ReleasesService // New service
+	Branches      BranchesService
 }
 
 // GitLabError represents an error response from the GitLab API.
@@ -101,6 +102,7 @@ func NewClient() (*Client, error) {
 	c.Tags = &tagsService{client: c}
 	c.Commits = &commitsService{client: c}
 	c.Releases = &releasesService{client: c} // Initialize new service
+	c.Branches = &branchesService{client: c}
 
 	return c, nil
 }
