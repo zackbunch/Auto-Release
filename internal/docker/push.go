@@ -12,24 +12,30 @@ func PushImage(opts *BuildOptions) error {
 		return nil
 	}
 
-	if opts.DryRun {
-		executil.DryRunCMD("docker", "login", "-u", "<redacted>", "-p", "<redacted>", os.Getenv("CI_REGISTRY"))
-		executil.DryRunCMD("docker", "push", opts.FullImage)
-		return nil
+	// real login (if not dry run)
+	if !opts.DryRun {
+		registry := os.Getenv("CI_REGISTRY")
+		user := os.Getenv("CI_REGISTRY_USER")
+		password := os.Getenv("CI_REGISTRY_PASSWORD")
+
+		if registry == "" || user == "" || password == "" {
+			return fmt.Errorf("missing CI_REGISTRY, CI_REGISTRY_USER, or CI_REGISTRY_PASSWORD environment variable")
+		}
+
+		if err := executil.RunCMD("docker", "login", "-u", user, "-p", password, registry); err != nil {
+			return fmt.Errorf("docker login failed: %w", err)
+		}
 	}
 
-	// real login + push
-	registry := os.Getenv("CI_REGISTRY")
-	user := os.Getenv("CI_REGISTRY_USER")
-	password := os.Getenv("CI_REGISTRY_PASSWORD")
-
-	if registry == "" || user == "" || password == "" {
-		return fmt.Errorf("missing CI_REGISTRY, CI_REGISTRY_USER, or CI_REGISTRY_PASSWORD environment variable")
+	for _, fullImage := range opts.FullImages {
+		if opts.DryRun {
+			executil.DryRunCMD("docker", "push", fullImage)
+		} else {
+			if err := executil.RunCMD("docker", "push", fullImage); err != nil {
+				return fmt.Errorf("docker push failed for %s: %w", fullImage, err)
+			}
+		}
 	}
 
-	if err := executil.RunCMD("docker", "login", "-u", user, "-p", password, registry); err != nil {
-		return fmt.Errorf("docker login failed: %w", err)
-	}
-
-	return executil.RunCMD("docker", "push", opts.FullImage)
+	return nil
 }

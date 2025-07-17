@@ -13,7 +13,7 @@ type BuildOptions struct {
 	ExtraBuildArgs []string
 	ImageName      string
 	TargetTag      string
-	FullImage      string
+	FullImages     []string
 	Push           bool
 	DryRun         bool
 }
@@ -36,11 +36,14 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 	tag := ctx.ShortSHA
 	env := deriveOpenShiftEnv(ctx)
 
-	var fullImage string
-	if ctx.IsFeatureBranch {
-		fullImage = fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, ctx.RefName, tag)
+	var fullImages []string
+	if ctx.RefName == "dev" {
+		baseImage := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
+		fullImages = []string{baseImage + ":dev-" + tag, baseImage + ":latest"}
+	} else if ctx.IsFeatureBranch {
+		fullImages = []string{fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, ctx.RefName, tag)}
 	} else {
-		fullImage = fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)
+		fullImages = []string{fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)}
 	}
 
 	return &BuildOptions{
@@ -49,7 +52,7 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 		ExtraBuildArgs: extraArgs,
 		ImageName:      appName,
 		TargetTag:      tag,
-		FullImage:      fullImage,
+		FullImages:     fullImages,
 		Push:           os.Getenv("SYAC_PUSH") == "true",
 		DryRun:         ctx.DryRun,
 	}, nil

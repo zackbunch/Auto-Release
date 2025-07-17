@@ -8,9 +8,13 @@ import (
 func BuildImage(opts *BuildOptions) error {
 	args := []string{
 		"build",
-		"-t", opts.FullImage,
-		"-f", opts.Dockerfile,
 	}
+
+	for _, img := range opts.FullImages {
+		args = append(args, "-t", img)
+	}
+
+	args = append(args, "-f", opts.Dockerfile)
 
 	for _, arg := range opts.ExtraBuildArgs {
 		args = append(args, "--build-arg", arg)
@@ -23,6 +27,6 @@ func BuildImage(opts *BuildOptions) error {
 		return nil
 	}
 
-	fmt.Printf("Building image: %s\n", opts.FullImage)
+	fmt.Printf("Building images: %v\n", opts.FullImages)
 	return executil.RunCMD("docker", args...)
 }
