@@ -79,6 +79,18 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Feature Branch        : %t\n", c.IsFeatureBranch)
 	fmt.Printf("  Force Push            : %t\n", c.ForcePush)
 	fmt.Printf("  Application Name      : %s\n", c.ApplicationName)
+
+	// Add latest release
+	latestRelease, err := client.Releases.GetLatestRelease()
+	if err != nil {
+		fmt.Printf("  Latest Release        : No Release Yet (%v)\n", err)
+	} else {
+		fmt.Printf("  Latest Release        : %s (Tag: %s)\n", latestRelease.Name, latestRelease.TagName)
+		fmt.Printf("    Description         : %s\n", latestRelease.Description)
+		fmt.Printf("    Created At          : %s\n", latestRelease.CreatedAt)
+	}
+
+	fmt.Println()
 }
 
 func (c Context) describeContext() string {

@@ -16,3 +16,10 @@ type MergeRequest struct {
 type ProtectedBranch struct {
 	Name string `json:"name"`
 }
+
+type Release struct {
+	TagName     string `json:"tag_name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"created_at"`
+}
