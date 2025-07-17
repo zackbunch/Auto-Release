@@ -2,6 +2,7 @@ package promote
 
 import (
 	"fmt"
+	"syac/internal/executil"
 )
 
 type Options struct {
@@ -35,9 +36,12 @@ func Standard(from, to string, opts Options) error {
 
 // tagAndPush is currently stubbed — replace with docker exec logic later
 func tagAndPush(from, to string) error {
-	fmt.Printf("[STUB] docker tag %s %s\n", from, to)
-	fmt.Printf("[STUB] docker push %s\n", to)
-	// return nil to simulate success
+	if err := executil.RunCMD("docker", "tag", from, to); err != nil {
+		return fmt.Errorf("failed to tag image: %w", err)
+	}
+	if err := executil.RunCMD("docker", "push", to); err != nil {
+		return fmt.Errorf("failed to push image: %w", err)
+	}
 	return nil
 }
 

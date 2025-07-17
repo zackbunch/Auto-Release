@@ -31,7 +31,11 @@ func DryRunCMDWithDir(dir, name string, args ...string) {
 func run(dir string, dry bool, name string, args ...string) error {
 	fullCmd := fmt.Sprintf("%s %s", name, strings.Join(args, " "))
 	if dry {
-		fmt.Printf("[DRY RUN] %s\n", fullCmd)
+		if dir != "" {
+			fmt.Printf("[DRY RUN in %s] %s\n", dir, fullCmd)
+		} else {
+			fmt.Printf("[DRY RUN] %s\n", fullCmd)
+		}
 		return nil
 	}
 

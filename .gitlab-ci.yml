@@ -13,11 +13,25 @@ variables:
   SECRET_DETECTION_EXCLUDED_PATHS: ""
 
 stages:
+  - setup
   - build
   - build-rc
   - scan
   - promote
   - release
+
+# This job compiles the syac binary, which is then used by the publish stage.
+build_binary:
+  stage: setup
+  image: golang:1.24
+  script:
+    # Build a statically-linked binary to ensure it runs in the minimal Docker container.
+    - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
+  artifacts:
+    paths:
+      - syac
+    expire_in: 1 hour
+
 
 # -----------------------------------------------------------------------------
 # 1) Feature builds (local-only)
@@ -25,11 +39,14 @@ stages:
 build_feature:
   extends: .build-dind
   stage: build
+  dependencies:
+    - build_binary
   rules:
     - if: "$CI_COMMIT_REF_NAME =~ /^cli$/"
       when: always
     - when: never
   script:
+    - syac version
     - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
     - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
 

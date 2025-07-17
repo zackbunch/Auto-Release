@@ -31,11 +31,7 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 
 	extraArgs := strings.Fields(os.Getenv("SYAC_BUILD_EXTRA_ARGS"))
 
-	appName := os.Getenv("SYAC_APPLICATION_NAME")
-	if appName == "" {
-		parts := strings.Split(ctx.RegistryImage, "/")
-		appName = parts[len(parts)-1]
-	}
+	appName := ctx.ApplicationName
 
 	tag := ctx.ShortSHA
 	env := deriveOpenShiftEnv(ctx)
