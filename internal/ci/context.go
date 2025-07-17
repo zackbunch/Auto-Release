@@ -20,6 +20,7 @@ type Context struct {
 	Sprint          string
 	ForcePush       bool
 	ApplicationName string
+	DryRun          bool
 
 	IsMergeRequest  bool
 	IsTag           bool
@@ -27,7 +28,7 @@ type Context struct {
 	IsDefaultBranch bool
 }
 
-func LoadContext() (Context, error) {
+func LoadContext(dryRun bool) (Context, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
 	tag := os.Getenv("CI_COMMIT_TAG")
 	defaultBranch := os.Getenv("CI_DEFAULT_BRANCH")
@@ -56,6 +57,7 @@ func LoadContext() (Context, error) {
 			}
 			return appName
 		}(),
+		DryRun: dryRun,
 	}, nil
 }
 

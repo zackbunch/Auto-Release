@@ -12,7 +12,7 @@ var contextCmd = &cobra.Command{
 	Use:   "context",
 	Short: "Print a summary of the CI/CD context",
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx, err := ci.LoadContext()
+		ctx, err := ci.LoadContext(dryRunFlag)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error loading context: %v\n", err)
 			os.Exit(1)

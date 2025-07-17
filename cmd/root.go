@@ -11,6 +11,7 @@ import (
 
 var (
 	gitlabClient *gitlab.Client
+	dryRunFlag   bool
 
 	rootCmd = &cobra.Command{
 		Use:   "syac",
@@ -24,6 +25,19 @@ environments.
 
 SYAC provides commands for building, promoting, and releasing Docker images,
 and integrates with GitLab for versioning and release management.`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			dryRunFlag, err = cmd.Flags().GetBool("dry-run")
+			if err != nil {
+				return fmt.Errorf("failed to get dry-run flag: %w", err)
+			}
+
+			gitlabClient, err = gitlab.NewClient()
+			if err != nil {
+				return fmt.Errorf("error initializing GitLab client: %w", err)
+			}
+			return nil
+		},
 	}
 )
 
@@ -33,15 +47,9 @@ func init() {
 
 // Execute is the entrypoint for the CLI
 func Execute() {
-	var err error
-	gitlabClient, err = gitlab.NewClient()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing GitLab client: %v\n", err)
-		os.Exit(1)
-	}
-
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Command failed: %v\n", err)
 		os.Exit(1)
 	}
 }
+

@@ -22,7 +22,7 @@ Dockerfile path, and build context.
 This command is typically used early in the CI pipeline to create the initial
 immutable artifact.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx, err := ci.LoadContext()
+		ctx, err := ci.LoadContext(dryRunFlag)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to load context: %v", err)
 			os.Exit(1)

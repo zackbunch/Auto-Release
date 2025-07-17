@@ -51,7 +51,7 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 		TargetTag:      tag,
 		FullImage:      fullImage,
 		Push:           os.Getenv("SYAC_PUSH") == "true",
-		DryRun:         os.Getenv("SYAC_DRY_RUN") == "true",
+		DryRun:         ctx.DryRun,
 	}, nil
 }
 
