@@ -47,7 +47,7 @@ build_feature:
     - when: never
   before_script:
     - chmod +x syac
-    - ./syac version
+    - ./syac context
   script:
     - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
     - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
