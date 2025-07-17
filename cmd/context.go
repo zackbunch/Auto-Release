@@ -17,7 +17,7 @@ var contextCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error loading context: %v\n", err)
 			os.Exit(1)
 		}
-		ctx.PrintSummary()
+		ctx.PrintSummary(gitlabClient)
 	},
 }
 
