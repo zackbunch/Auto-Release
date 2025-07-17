@@ -2,18 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"syac/internal/promote"
 
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(promoteCmd)
-}
-
 var promoteCmd = &cobra.Command{
 	Use:   "promote",
-	Short: "Promote an image between environments",
+	Short: "Promote an image between environments by retagging and pushing",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		from, err := cmd.Flags().GetString("from")
 		if err != nil {
@@ -35,29 +32,41 @@ var promoteCmd = &cobra.Command{
 			return fmt.Errorf("failed to read 'strategy' flag: %w", err)
 		}
 
-		opts := promote.Options{
-			PushLatest: pushLatest,
+		dryRun, err := cmd.Flags().GetBool("dry-run")
+		if err != nil {
+			return fmt.Errorf("failed to read 'dry-run' flag: %w", err)
 		}
 
+		opts := promote.Options{
+			PushLatest: pushLatest,
+			DryRun:     dryRun,
+		}
+
+		strategy = strings.ToLower(strategy)
+
 		switch strategy {
-		case "standard", "bluegreen", "canary":
+		case "standard":
 			if from == "" {
-				return fmt.Errorf("'from' is required for the '%s' strategy", strategy)
+				return fmt.Errorf("--from is required for standard strategy")
 			}
 			return promote.Standard(from, to, opts)
-		case "rollback":
-			return promote.Rollback(to, opts)
+
+		case "bluegreen", "canary", "rollback":
+			return fmt.Errorf("strategy '%s' is not yet implemented", strategy)
+
 		default:
-			return fmt.Errorf("unknown strategy: %s", strategy)
+			return fmt.Errorf("unknown strategy: '%s' (must be: standard)", strategy)
 		}
 	},
 }
 
 func init() {
+	rootCmd.AddCommand(promoteCmd)
+
 	promoteCmd.Flags().String("from", "", "Image tag to promote from (e.g. dev-abc123)")
 	promoteCmd.Flags().String("to", "", "Target environment name (e.g. test)")
 	promoteCmd.Flags().Bool("push-latest", false, "Also tag and push 'latest'")
-	promoteCmd.Flags().String("strategy", "standard", "Promotion strategy (standard|bluegreen|canary|rollback)")
-	
+	promoteCmd.Flags().String("strategy", "standard", "Promotion strategy (standard only supported)")
+
 	_ = promoteCmd.MarkFlagRequired("to")
 }

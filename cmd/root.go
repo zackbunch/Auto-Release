@@ -21,6 +21,10 @@ SYAC provides commands for building, promoting, and releasing Docker images,
 integrating with GitLab for versioning and release management.`,
 }
 
+func init() {
+	rootCmd.PersistentFlags().Bool("dry-run", false, "Simulate execution without making any changes")
+}
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
