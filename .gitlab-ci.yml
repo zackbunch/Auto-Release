@@ -11,6 +11,7 @@ variables:
   SECRET_DETECTION_IMAGE_SUFFIX: ""
   SECRETS_ANALYZER_VERSION:      "7"
   SECRET_DETECTION_EXCLUDED_PATHS: ""
+  SYAC_SPRINT: "329"
 
 stages:
   - setup
@@ -26,7 +27,6 @@ build_binary:
   image: golang:1.24
   variables:
     SYAC_APPLICATION_NAME: syaccli
-    SYAC_SPRINT: "329"
   script:
     # Build a statically-linked binary to ensure it runs in the minimal Docker container.
     - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
