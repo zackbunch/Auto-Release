@@ -37,7 +37,12 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 	env := deriveOpenShiftEnv(ctx)
 
 	var fullImages []string
-	if ctx.RefName == "dev" {
+	if ctx.IsMergeRequest && ctx.MergeRequestTarget == "dev" {
+		fullImages = []string{
+			fmt.Sprintf("%s:dev-%s", ctx.RegistryImage, tag),
+			fmt.Sprintf("%s:dev-latest", ctx.RegistryImage),
+		}
+	} else if ctx.RefName == "dev" {
 		baseImage := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
 		fullImages = []string{baseImage + ":dev-" + tag, baseImage + ":latest"}
 	} else if ctx.IsFeatureBranch {
