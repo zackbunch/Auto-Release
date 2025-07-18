@@ -1,5 +1,6 @@
 include:
   - local: '.ci-templates/docker.gitlab-ci.yml'
+  - local: '.ci-templates/secrets.gitlab-ci.yml'
 
 variables:
   BRANCH_SLUG:    $CI_COMMIT_REF_SLUG
@@ -85,20 +86,6 @@ build_rc:
 # -----------------------------------------------------------------------------
 # 3) Secret Detection scan
 # -----------------------------------------------------------------------------
-.secret-analyzer:
-  stage: scan
-  image: "$SECURE_ANALYZERS_PREFIX/secrets:$SECRETS_ANALYZER_VERSION$SECRET_DETECTION_IMAGE_SUFFIX"
-  services: []
-  allow_failure: false
-  variables:
-    GIT_DEPTH: "50"
-  artifacts:
-    access: developer
-    reports:
-      secret_detection: gl-secret-detection-report.json
-    paths:
-      - gl-secret-detection-report.json
-
 secret_detection:
   extends: .secret-analyzer
   needs: ["build_rc"]
