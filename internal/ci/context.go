@@ -105,7 +105,7 @@ func (c Context) describeContext() string {
 	case c.IsTag:
 		return fmt.Sprintf("Tag push (%s)", c.Tag)
 	case c.IsFeatureBranch:
-		return fmt.Sprintf("Developer Push to feature branch (%s)", c.RefName)
+		return fmt.Sprintf("Development Branch (%s)", c.RefName)
 	case c.IsDefaultBranch:
 		return fmt.Sprintf("Push to default branch (%s)", c.RefName)
 	default:
