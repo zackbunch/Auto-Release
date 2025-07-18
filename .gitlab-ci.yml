@@ -123,7 +123,7 @@ promote_to_test:
       when: always
     - when: never
   script:
-    - syac-promote --from dev-$IMAGE_SHORT --to test --push-latest
+    - ./syac promote --from dev-latest --to test --push-latest
 
 # -----------------------------------------------------------------------------
 # 5) Promote test → int
