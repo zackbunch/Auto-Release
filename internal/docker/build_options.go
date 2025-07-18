@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
 	"syac/internal/ci"
 )
 
@@ -18,52 +19,46 @@ type BuildOptions struct {
 	DryRun         bool
 }
 
+// BuildOptionsFromContext constructs BuildOptions based on the CI context.
 func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
+	// Determine Dockerfile
 	dockerfile := os.Getenv("SYAC_DOCKERFILE")
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
 	}
 
+	// Determine build context
 	buildContext := os.Getenv("SYAC_BUILD_CONTEXT")
 	if buildContext == "" {
 		buildContext = "."
 	}
 
+	// Parse extra build args
 	extraArgs := strings.Fields(os.Getenv("SYAC_BUILD_EXTRA_ARGS"))
 
+	// Application name and SHA tag
 	appName := ctx.ApplicationName
+	sha := ctx.ShortSHA
 
-	tag := ctx.ShortSHA
+	// Determine OpenShift environment
 	env := deriveOpenShiftEnv(ctx)
 
-	var fullImages []string
-	if ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev" {
-		baseImage := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
-		fullImages = []string{
-			fmt.Sprintf("%s:%s", baseImage, tag),
-			fmt.Sprintf("%s:latest", baseImage),
-		}
-	} else if ctx.RefName == "dev" {
-		baseImage := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
-		fullImages = []string{baseImage + ":dev-" + tag, baseImage + ":latest"}
-	} else if ctx.IsFeatureBranch {
-		fullImages = []string{fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, ctx.RefName, tag)}
-	} else {
-		fullImages = []string{fmt.Sprintf("%s/%s/%s:%s", ctx.RegistryImage, env, appName, tag)}
-	}
+	// Generate all image tags (immutable + floating)
+	fullImages := generateBuildTags(ctx, env, appName, sha)
 
 	return &BuildOptions{
 		Dockerfile:     dockerfile,
 		ContextPath:    buildContext,
 		ExtraBuildArgs: extraArgs,
 		ImageName:      appName,
-		TargetTag:      tag,
+		TargetTag:      sha,
 		FullImages:     fullImages,
 		Push:           os.Getenv("SYAC_PUSH") == "true",
 		DryRun:         ctx.DryRun,
 	}, nil
 }
 
+// deriveOpenShiftEnv maps branch context to OpenShift environment
 func deriveOpenShiftEnv(ctx ci.Context) string {
 	if ctx.IsTag {
 		return "prod"
@@ -80,5 +75,33 @@ func deriveOpenShiftEnv(ctx ci.Context) string {
 		return "int"
 	default:
 		return "dev"
+	}
+}
+
+// generateBuildTags returns both immutable and floating tags
+// for the given context, environment, application name, and SHA.
+func generateBuildTags(ctx ci.Context, env, appName, sha string) []string {
+	base := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
+
+	switch {
+	// Release Candidate build on dev MRs: rc-<sha> + rc-latest
+	case ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev":
+		rcTag := fmt.Sprintf("rc-%s", sha)
+		return []string{
+			fmt.Sprintf("%s:%s", base, rcTag), // e.g. myreg/dev/myapp:rc-a1b2c3d
+			fmt.Sprintf("%s:rc-latest", base), // e.g. myreg/dev/myapp:rc-latest
+		}
+
+	// Feature branch build: feature-specific namespace + SHA
+	case ctx.IsFeatureBranch:
+		return []string{
+			fmt.Sprintf("%s/%s:%s", base, ctx.RefName, sha),
+		}
+
+	// Default build: appName + SHA
+	default:
+		return []string{
+			fmt.Sprintf("%s:%s", base, sha),
+		}
 	}
 }
