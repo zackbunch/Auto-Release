@@ -1,14 +1,15 @@
 .build-dind:
   image: docker:24.0.5
-  services:
-    - name: $DIND_IMAGE
-      alias: docker
   variables:
     DIND_IMAGE:       docker:24.0.5-dind
     DOCKER_DRIVER:    overlay2
     # DOCKER_HOST:      tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
+  services:
+    - name: $DIND_IMAGE
+      alias: docker
   before_script:
     - set -euxo pipefail
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker info
+  after_script:
+    - docker logout "$CI_REGISTRY" || true
