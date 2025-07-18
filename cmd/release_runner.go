@@ -7,11 +7,12 @@ import (
 )
 
 type ReleaseOptions struct {
-	DryRun  bool
-	Bump    string
-	Ref     string
-	Message string
-	GitLab  *gitlab.Client
+	DryRun      bool
+	Bump        string
+	Ref         string
+	Name        string
+	Description string
+	GitLab      *gitlab.Client
 }
 
 func RunRelease(opts ReleaseOptions) error {
@@ -43,13 +44,18 @@ func RunRelease(opts ReleaseOptions) error {
 		return nil
 	}
 
-	fmt.Printf("[release] Creating tag v%s from ref %s\n", next, opts.Ref)
-
-	err = opts.GitLab.Tags.CreateTag(next.String(), opts.Ref, opts.Message)
-	if err != nil {
-		return fmt.Errorf("failed to create tag: %w", err)
+	name := opts.Name
+	if name == "" {
+		name = next.String()
 	}
 
-	fmt.Printf("[release] Successfully created release v%s\n", next)
+	fmt.Printf("[release] Creating release %s from ref %s\n", name, opts.Ref)
+
+	err = opts.GitLab.Releases.CreateRelease(next.String(), opts.Ref, name, opts.Description)
+	if err != nil {
+		return fmt.Errorf("failed to create release: %w", err)
+	}
+
+	fmt.Printf("[release] Successfully created release %s\n", name)
 	return nil
 }
