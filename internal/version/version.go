@@ -71,3 +71,17 @@ func (v Version) LessThan(other Version) bool {
 	}
 	return v.Patch < other.Patch
 }
+
+// ParseVersionType converts a string like "major" into a VersionType enum
+func ParseVersionType(s string) (VersionType, error) {
+	switch strings.ToLower(s) {
+	case "major":
+		return Major, nil
+	case "minor":
+		return Minor, nil
+	case "patch":
+		return Patch, nil
+	default:
+		return "", fmt.Errorf("invalid bump type: %q. Must be one of: major, minor, patch", s)
+	}
+}

@@ -18,8 +18,13 @@ type ProtectedBranch struct {
 }
 
 type Release struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
+	TagName     string `json:"tag_name"`              // e.g. v1.2.3
+	Name        string `json:"name"`                  // e.g. "Release v1.2.3"
+	Description string `json:"description,omitempty"` // release notes or changelog
+	CreatedAt   string `json:"created_at,omitempty"`  // ISO 8601 UTC timestamp
+
+	Ref          string `json:"ref,omitempty"`        // commit SHA or branch/tag
+	Committer    string `json:"committer,omitempty"`  // name/email if available
+	IsDraft      bool   `json:"draft,omitempty"`      // pre-release state
+	IsPreRelease bool   `json:"prerelease,omitempty"` // semantic pre-release flag (v1.2.3-beta.1)
 }
