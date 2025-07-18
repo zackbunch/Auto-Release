@@ -40,7 +40,7 @@ func LoadContext(dryRun bool) (Context, error) {
 		SHA:                os.Getenv("CI_COMMIT_SHA"),
 		ShortSHA:           os.Getenv("CI_COMMIT_SHORT_SHA"),
 		MRID:               os.Getenv("CI_MERGE_REQUEST_IID"),
-		MergeRequestTarget: os.Getenv("$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
+		MergeRequestTarget: os.Getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
 		Tag:                tag,
 		ProjectPath:        os.Getenv("CI_PROJECT_PATH"),
 		RegistryImage:      os.Getenv("CI_REGISTRY_IMAGE"),
@@ -75,7 +75,7 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Commit SHA            : %s\n", c.SHA)
 	fmt.Printf("  Commit Short SHA      : %s\n", c.ShortSHA)
 	fmt.Printf("  Merge Request IID     : %s\n", c.MRID)
-	fmt.Printf("  Merge Request Target     : %s\n", c.MergeRequestTarget)
+	fmt.Printf("  Merge Request Target  : %s\n", c.MergeRequestTarget)
 	fmt.Printf("  Project Path          : %s\n", c.ProjectPath)
 	fmt.Printf("  Registry Image        : %s\n", c.RegistryImage)
 	fmt.Printf("  Default Branch        : %s\n", c.DefaultBranch)
