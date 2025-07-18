@@ -8,20 +8,20 @@ import (
 )
 
 type Context struct {
-	Source             string
-	RefName            string
-	SHA                string
-	ShortSHA           string
-	MRID               string
-	Tag                string
-	ProjectPath        string
-	RegistryImage      string
-	DefaultBranch      string
-	Sprint             string
-	ForcePush          bool
-	ApplicationName    string
-	DryRun             bool
-	MergeRequestTarget string
+	Source                   string
+	RefName                  string
+	SHA                      string
+	ShortSHA                 string
+	MRID                     string
+	Tag                      string
+	ProjectPath              string
+	RegistryImage            string
+	DefaultBranch            string
+	Sprint                   string
+	ForcePush                bool
+	ApplicationName          string
+	DryRun                   bool
+	MergeRequestTargetBranch string
 
 	IsMergeRequest  bool
 	IsTag           bool
@@ -35,22 +35,22 @@ func LoadContext(dryRun bool) (Context, error) {
 	defaultBranch := os.Getenv("CI_DEFAULT_BRANCH")
 
 	return Context{
-		Source:             os.Getenv("CI_PIPELINE_SOURCE"),
-		RefName:            ref,
-		SHA:                os.Getenv("CI_COMMIT_SHA"),
-		ShortSHA:           os.Getenv("CI_COMMIT_SHORT_SHA"),
-		MRID:               os.Getenv("CI_MERGE_REQUEST_IID"),
-		MergeRequestTarget: os.Getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
-		Tag:                tag,
-		ProjectPath:        os.Getenv("CI_PROJECT_PATH"),
-		RegistryImage:      os.Getenv("CI_REGISTRY_IMAGE"),
-		DefaultBranch:      defaultBranch,
-		Sprint:             os.Getenv("SYAC_SPRINT"),
-		IsMergeRequest:     os.Getenv("CI_PIPELINE_SOURCE") == "merge_request_event",
-		IsTag:              tag != "",
-		IsFeatureBranch:    strings.HasPrefix(ref, "gm-"),
-		IsDefaultBranch:    ref == defaultBranch,
-		ForcePush:          os.Getenv("SYAC_FORCE_PUSH") == "true",
+		Source:                   os.Getenv("CI_PIPELINE_SOURCE"),
+		RefName:                  ref,
+		SHA:                      os.Getenv("CI_COMMIT_SHA"),
+		ShortSHA:                 os.Getenv("CI_COMMIT_SHORT_SHA"),
+		MRID:                     os.Getenv("CI_MERGE_REQUEST_IID"),
+		MergeRequestTargetBranch: os.Getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
+		Tag:                      tag,
+		ProjectPath:              os.Getenv("CI_PROJECT_PATH"),
+		RegistryImage:            os.Getenv("CI_REGISTRY_IMAGE"),
+		DefaultBranch:            defaultBranch,
+		Sprint:                   os.Getenv("SYAC_SPRINT"),
+		IsMergeRequest:           os.Getenv("CI_PIPELINE_SOURCE") == "merge_request_event",
+		IsTag:                    tag != "",
+		IsFeatureBranch:          strings.HasPrefix(ref, "gm-"),
+		IsDefaultBranch:          ref == defaultBranch,
+		ForcePush:                os.Getenv("SYAC_FORCE_PUSH") == "true",
 		ApplicationName: func() string {
 			appName := os.Getenv("SYAC_APPLICATION_NAME")
 			if appName == "" {
@@ -75,7 +75,7 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Commit SHA            : %s\n", c.SHA)
 	fmt.Printf("  Commit Short SHA      : %s\n", c.ShortSHA)
 	fmt.Printf("  Merge Request IID     : %s\n", c.MRID)
-	fmt.Printf("  Merge Request Target  : %s\n", c.MergeRequestTarget)
+	fmt.Printf("  Merge Request Target  : %s\n", c.MergeRequestTargetBranch)
 	fmt.Printf("  Project Path          : %s\n", c.ProjectPath)
 	fmt.Printf("  Registry Image        : %s\n", c.RegistryImage)
 	fmt.Printf("  Default Branch        : %s\n", c.DefaultBranch)
