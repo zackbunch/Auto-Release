@@ -8,10 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// promoteCmd represents the promote command in the syac CLI.
 var promoteCmd = &cobra.Command{
 	Use:   "promote",
 	Short: "Promote an image between environments by retagging and pushing",
+	Long:  `Retags an existing image (e.g., dev-latest) to a target environment tag (e.g., test-<sha>) and optionally updates the floating latest pointer.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Read flags
 		from, err := cmd.Flags().GetString("from")
 		if err != nil {
 			return fmt.Errorf("failed to read 'from' flag: %w", err)
@@ -27,14 +30,14 @@ var promoteCmd = &cobra.Command{
 			return fmt.Errorf("failed to read 'push-latest' flag: %w", err)
 		}
 
-		strategy, err := cmd.Flags().GetString("strategy")
-		if err != nil {
-			return fmt.Errorf("failed to read 'strategy' flag: %w", err)
-		}
-
 		dryRun, err := cmd.Flags().GetBool("dry-run")
 		if err != nil {
 			return fmt.Errorf("failed to read 'dry-run' flag: %w", err)
+		}
+
+		strategy, err := cmd.Flags().GetString("strategy")
+		if err != nil {
+			return fmt.Errorf("failed to read 'strategy' flag: %w", err)
 		}
 
 		opts := promote.Options{
@@ -42,6 +45,7 @@ var promoteCmd = &cobra.Command{
 			DryRun:     dryRun,
 		}
 
+		// Normalize strategy
 		strategy = strings.ToLower(strategy)
 
 		switch strategy {
@@ -63,10 +67,13 @@ var promoteCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(promoteCmd)
 
+	// Define command-line flags
 	promoteCmd.Flags().String("from", "", "Image tag to promote from (e.g. dev-abc123)")
-	promoteCmd.Flags().String("to", "", "Target environment name (e.g. test)")
-	promoteCmd.Flags().Bool("push-latest", false, "Also tag and push 'latest'")
+	promoteCmd.Flags().String("to", "", "Target image tag (e.g. test-abc123)")
+	promoteCmd.Flags().Bool("push-latest", false, "Also tag and push 'latest' for the target environment")
 	promoteCmd.Flags().String("strategy", "standard", "Promotion strategy (standard only supported)")
+	promoteCmd.Flags().Bool("dry-run", false, "Simulate promotion without executing Docker commands")
 
+	// 'to' flag is mandatory
 	_ = promoteCmd.MarkFlagRequired("to")
 }
