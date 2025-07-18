@@ -81,27 +81,27 @@ func deriveOpenShiftEnv(ctx ci.Context) string {
 // generateBuildTags returns both immutable and floating tags
 // for the given context, environment, application name, and SHA.
 func generateBuildTags(ctx ci.Context, env, appName, sha string) []string {
-	base := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
-
-	switch {
-	// Release Candidate build on dev MRs: rc-<sha> + rc-latest
-	case ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev":
+	// For RC builds, drop the env segment entirely:
+	if ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev" {
+		base := fmt.Sprintf("%s/%s", ctx.RegistryImage, appName)
 		rcTag := fmt.Sprintf("rc-%s", sha)
 		return []string{
-			fmt.Sprintf("%s:%s", base, rcTag), // e.g. myreg/dev/myapp:rc-a1b2c3d
-			fmt.Sprintf("%s:rc-latest", base), // e.g. myreg/dev/myapp:rc-latest
+			fmt.Sprintf("%s:%s", base, rcTag), // e.g. registry/.../app:rc-abc123
+			fmt.Sprintf("%s:rc-latest", base), // e.g. registry/.../app:rc-latest
 		}
+	}
 
-	// Feature branch build: feature-specific namespace + SHA
-	case ctx.IsFeatureBranch:
+	// Otherwise, include the env folder as before:
+	base := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
+	if ctx.IsFeatureBranch {
+		// feature branches get their own folder under the env
 		return []string{
 			fmt.Sprintf("%s/%s:%s", base, ctx.RefName, sha),
 		}
+	}
 
-	// Default build: appName + SHA
-	default:
-		return []string{
-			fmt.Sprintf("%s:%s", base, sha),
-		}
+	// default: one immutable tag in its env
+	return []string{
+		fmt.Sprintf("%s:%s", base, sha),
 	}
 }
