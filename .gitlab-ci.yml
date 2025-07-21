@@ -44,102 +44,42 @@ build_binary:
 # -----------------------------------------------------------------------------
 # 1) Feature builds (no push)
 # -----------------------------------------------------------------------------
-build_feature:
-  extends: .build-dind
-  stage: build
-  dependencies:
-    - build_binary
-  rules:
-    - if: '$CI_COMMIT_REF_NAME =~ /^gm-[0-9]+$/ && $CI_PIPELINE_SOURCE != "merge_request_event"'
-      when: always
-    - when: never
-  before_script:
-    - chmod +x syac
-    - ./syac context
-  script:
-    - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
-    - ./syac build
-    - ./syac push --dry-run
-    # - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
+# build_feature:
+#   extends: .build-dind
+#   stage: build
+#   dependencies:
+#     - build_binary
+#   rules:
+#     - if: '$CI_COMMIT_REF_NAME =~ /^gm-[0-9]+$/ && $CI_PIPELINE_SOURCE != "merge_request_event"'
+#       when: always
+#     - when: never
+#   before_script:
+#     - chmod +x syac
+#     - ./syac context
+#   script:
+#     - echo "Building feature image (no push) $BRANCH_IMAGE:$IMAGE_SHORT"
+#     - ./syac build
+#     - ./syac push --dry-run
+#     # - docker build -t "$BRANCH_IMAGE:$IMAGE_SHORT" .
 
-# -----------------------------------------------------------------------------
-# 2) RC build on MR → dev
-# -----------------------------------------------------------------------------
-build_rc:
-  extends:
-    - .build-dind
-  stage: build-rc
-  environment:
-    name: dev
-    url: https://dev.apps.openshift.com 
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"'
-      when: always
-    - when: never
-  script:
-    - docker pull "$REG:dev-latest" || true
-    - docker build --cache-from "$REG:dev-latest" -t "$REG:dev-$IMAGE_SHORT" .
-    - docker push "$REG:dev-$IMAGE_SHORT"
-    - docker tag "$REG:dev-$IMAGE_SHORT" "$REG:dev-latest"
-    - docker push "$REG:dev-latest"
+# # -----------------------------------------------------------------------------
+# # 2) RC build on MR → dev
+# # -----------------------------------------------------------------------------
+# build_rc:
+#   extends:
+#     - .build-dind
+#   stage: build-rc
+#   environment:
+#     name: dev
+#     url: https://dev.apps.openshift.com 
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"'
+#       when: always
+#     - when: never
+#   script:
+#     - docker pull "$REG:dev-latest" || true
+#     - docker build --cache-from "$REG:dev-latest" -t "$REG:dev-$IMAGE_SHORT" .
+#     - docker push "$REG:dev-$IMAGE_SHORT"
+#     - docker tag "$REG:dev-$IMAGE_SHORT" "$REG:dev-latest"
+#     - docker push "$REG:dev-latest"
 
-# -----------------------------------------------------------------------------
-# 3) Secret Detection scan
-# -----------------------------------------------------------------------------
-secret_detection:
-  extends: .secret-analyzer
-  needs: ["build_rc"]
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"'
-      when: always
-    - when: never
-  script:
-    - /analyzer run
-
-# -----------------------------------------------------------------------------
-# 4) Promote dev → test
-# -----------------------------------------------------------------------------
-promote_to_test:
-  extends:
-    - .build-dind
-  needs:
-    - secret_detection
-  stage: promote
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "test"'
-      when: always
-    - when: never
-  script:
-    - ./syac promote --from dev-latest --to test --push-latest
-
-# -----------------------------------------------------------------------------
-# 5) Promote test → int
-# -----------------------------------------------------------------------------
-promote_to_int:
-  extends:
-    - .build-dind
-  needs:
-    - promote_to_test
-  stage: promote
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "int"'
-      when: always
-    - when: never
-  script:
-    - syac-promote --from test-$IMAGE_SHORT --to int --push-latest
-
-# -----------------------------------------------------------------------------
-# 6) Release on master → semver + latest
-# -----------------------------------------------------------------------------
-create_release:
-  extends:
-    - .build-dind
-  needs:
-    - promote_to_int
-  stage: release
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
-      when: always
-    - when: never
-  script:
-    - syac-promote --from int-$IMAGE_SHORT --release
