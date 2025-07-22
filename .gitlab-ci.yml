@@ -42,7 +42,6 @@ build_feature:
     PUSH_IMAGE: "false"
   script:
     - syac context
-    - syac comment --dry-run
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
@@ -52,10 +51,13 @@ build_feature:
 # -----------------------------------------------
 build_dev:
   stage: build
+  image: registry.simulogix.com/personal-websites/syac/feature/syac:latest
   extends: [.build-dind, .build-common]
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
     PUSH_IMAGE: "true"
+  before_script:
+    - syac comment
   rules:
     # Only run if this is a merge result into dev
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
