@@ -29,6 +29,7 @@ build_binary:
     paths:
       - syac
     expire_in: 1 hour
+  when: always
 
 # -----------------------------------------------
 # Post version bump comment in MRs
