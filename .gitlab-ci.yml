@@ -54,6 +54,7 @@ build_feature:
     PUSH_IMAGE: "false"
   script:
     - syac context
+    - syac release --ref main --bump major --dry-run
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
