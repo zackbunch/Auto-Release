@@ -3,9 +3,9 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
+	"syac/internal/assets"
 	"syac/internal/version"
 )
 
@@ -46,15 +46,38 @@ func (s *mrsService) GetMergeRequestDescription(mrID string) (string, error) {
 }
 
 // CreateMergeRequestComment creates a new comment on a Merge Request
-func (s *mrsService) CreateMergeRequestComment(mrID string) error {
-	content, err := os.ReadFile("mr_comment.md")
+func (s *mrsService) hasComment(mrID string, commentContent string) (bool, error) {
+	notes, err := s.GetMergeRequestNotes(mrID)
 	if err != nil {
-		return fmt.Errorf("failed to read mr_comment.md: %w", err)
+		return false, fmt.Errorf("failed to get merge request notes: %w", err)
+	}
+
+	for _, note := range notes {
+		if strings.TrimSpace(note.Body) == strings.TrimSpace(commentContent) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *mrsService) CreateMergeRequestComment(mrID string) error {
+	contentBytes, err := assets.MrCommentContent.ReadFile("mr_comment.md")
+	if err != nil {
+		return fmt.Errorf("failed to read embedded mr_comment.md: %w", err)
+	}
+	content := string(contentBytes)
+
+	exists, err := s.hasComment(mrID, content)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing comment: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("comment already exists on MR %s", mrID)
 	}
 
 	path := fmt.Sprintf("/projects/%s/merge_requests/%s/notes", urlEncode(s.client.projectID), mrID)
 	payload := map[string]string{
-		"body": string(content),
+		"body": content,
 	}
 
 	_, err = s.client.DoRequest("POST", path, payload)
