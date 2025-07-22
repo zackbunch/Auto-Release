@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"syac/internal/ci"
 	"syac/internal/version"
 	"syac/pkg/gitlab"
 )
@@ -29,9 +30,32 @@ func RunRelease(opts ReleaseOptions) error {
 		}
 	}
 
-	bumpType, err := version.ParseVersionType(opts.Bump)
-	if err != nil {
-		return err
+	var bumpType version.VersionType
+	if opts.Bump != "" {
+		parsedBumpType, err := version.ParseVersionType(opts.Bump)
+		if err != nil {
+			return err
+		}
+		bumpType = parsedBumpType
+	} else {
+		// Try to get bump type from MR description if not explicitly provided
+		ctx, err := ci.LoadContext(opts.DryRun)
+		if err != nil {
+			return fmt.Errorf("failed to load CI context: %w", err)
+		}
+
+		if ctx.MRID != "" {
+			mrBumpType, err := opts.GitLab.MergeRequests.GetVersionBump(ctx.MRID)
+			if err != nil {
+				fmt.Printf("Warning: Failed to get version bump from MR %s description: %v. Defaulting to Patch.\n", ctx.MRID, err)
+				bumpType = version.Patch
+			} else {
+				bumpType = mrBumpType
+			}
+		} else {
+			fmt.Println("Warning: No explicit bump type provided and no MR ID found in CI context. Defaulting to Patch.")
+			bumpType = version.Patch
+		}
 	}
 
 	current, next, err := opts.GitLab.Tags.GetNextVersion(bumpType)
