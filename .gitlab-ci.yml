@@ -12,6 +12,24 @@ stages:
   - build
   - release
 
+# This job compiles the syac binary, which is then used by the publish stage.
+build_binary:
+  stage: setup
+  image: golang:1.24
+  variables:
+    SYAC_APPLICATION_NAME: syaccli
+  script:
+    # Build a statically-linked binary to ensure it runs in the minimal Docker container.
+    - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
+  after_script:
+    - chmod +x syac
+    - ./syac context
+  artifacts:
+    paths:
+      - syac
+    expire_in: 1 hour
+
+
 # -----------------------------------------------
 # Build on feature branches — gmarm-* (no push) 
 # -----------------------------------------------
@@ -44,20 +62,4 @@ build_dev:
       when: on_success
     - when: never
 
-# This job compiles the syac binary, which is then used by the publish stage.
-build_binary:
-  stage: setup
-  image: golang:1.24
-  variables:
-    SYAC_APPLICATION_NAME: syaccli
-  script:
-    # Build a statically-linked binary to ensure it runs in the minimal Docker container.
-    - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
-  after_script:
-    - chmod +x syac
-    - ./syac context
-  artifacts:
-    paths:
-      - syac
-    expire_in: 1 hour
 
