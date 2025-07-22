@@ -45,15 +45,14 @@ func (s *mrsService) GetMergeRequestDescription(mrID string) (string, error) {
 	return mr.Description, nil
 }
 
-// CreateMergeRequestComment creates a new comment on a Merge Request
-func (s *mrsService) hasComment(mrID string, commentContent string) (bool, error) {
+func (s *mrsService) hasComment(mrID string) (bool, error) {
 	notes, err := s.GetMergeRequestNotes(mrID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get merge request notes: %w", err)
 	}
-
+	// Check if any note contains the SYAC comment marker
 	for _, note := range notes {
-		if strings.TrimSpace(note.Body) == strings.TrimSpace(commentContent) {
+		if strings.Contains(note.Body, "[SYAC]") {
 			return true, nil
 		}
 	}
@@ -67,7 +66,7 @@ func (s *mrsService) CreateMergeRequestComment(mrID string) error {
 	}
 	content := string(contentBytes)
 
-	exists, err := s.hasComment(mrID, content)
+	exists, err := s.hasComment(mrID)
 	if err != nil {
 		return fmt.Errorf("failed to check for existing comment: %w", err)
 	}
@@ -76,9 +75,7 @@ func (s *mrsService) CreateMergeRequestComment(mrID string) error {
 	}
 
 	path := fmt.Sprintf("/projects/%s/merge_requests/%s/notes", urlEncode(s.client.projectID), mrID)
-	payload := map[string]string{
-		"body": content,
-	}
+	payload := map[string]string{"body": content}
 
 	_, err = s.client.DoRequest("POST", path, payload)
 	if err != nil {
