@@ -1,25 +1,17 @@
-include:
-  - project: 'personal-websites/pipeline-templates'
-    ref: 'main'
-    file: '/.ci-templates/docker.gitlab-ci.yml'
-
-variables:
-  SHORT_SHA: $CI_COMMIT_SHORT_SHA
-  APP_NAME: syaccli
-
 stages:
-  - setup
-  - build
-  - release
+  - setup      # compile + comment logic
+  - build      # image build
+  - release    # tagging and promotion
 
-# This job compiles the syac binary, which is then used by the publish stage.
+# -----------------------------------------------
+# Compile syac binary for use in later stages
+# -----------------------------------------------
 build_binary:
   stage: setup
   image: golang:1.24
   variables:
     SYAC_APPLICATION_NAME: syaccli
   script:
-    # Build a statically-linked binary to ensure it runs in the minimal Docker container.
     - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
   after_script:
     - chmod +x syac
@@ -29,6 +21,17 @@ build_binary:
       - syac
     expire_in: 1 hour
 
+# -----------------------------------------------
+# Post version bump comment in MRs
+# -----------------------------------------------
+comment_bump_selector:
+  stage: setup
+  image: registry.simulogix.com/personal-websites/syac/feature/syac:latest
+  script:
+    - syac comment
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
 
 # -----------------------------------------------
 # Build on feature branches — gmarm-* (no push) 
@@ -45,23 +48,16 @@ build_feature:
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
-
 # -----------------------------------------------
 # Build on dev — push SHA + latest
 # -----------------------------------------------
 build_dev:
   stage: build
-  image: registry.simulogix.com/personal-websites/syac/feature/syac:latest
   extends: [.build-dind, .build-common]
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
     PUSH_IMAGE: "true"
-  before_script:
-    - syac comment
   rules:
-    # Only run if this is a merge result into dev
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
     - when: never
-
-
