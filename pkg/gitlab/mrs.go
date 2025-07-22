@@ -12,6 +12,7 @@ import (
 // MergeRequestsService defines the interface for GitLab Merge Request operations.
 type MergeRequestsService interface {
 	GetMergeRequestDescription(mrID string) (string, error)
+	UpdateMergeRequestDescription(mrID string, newDescription string) error
 	CreateMergeRequestComment(mrID string) error
 	GetMergeRequestNotes(mrID string) ([]MergeRequestNote, error)
 	GetVersionBump(mrID string) (version.VersionType, error)
@@ -147,4 +148,19 @@ func (s *mrsService) GetMergeRequestForCommit(sha string) (MergeRequest, error) 
 	}
 
 	return mrs[0], nil
+}
+
+func (s *mrsService) UpdateMergeRequestDescription(mrID string, newDescription string) error {
+	path := fmt.Sprintf("/projects/%s/merge_requests/%s", urlEncode(s.client.projectID), mrID)
+
+	payload := map[string]string{
+		"description": newDescription,
+	}
+
+	_, err := s.client.DoRequest("PUT", path, payload)
+	if err != nil {
+		return fmt.Errorf("failed to update merge request description: %w", err)
+	}
+
+	return nil
 }

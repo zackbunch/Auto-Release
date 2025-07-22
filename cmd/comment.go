@@ -5,14 +5,15 @@ import (
 	"os"
 	"strings"
 
+	"syac/internal/assets"
 	"syac/internal/ci"
 
 	"github.com/spf13/cobra"
 )
 
 var commentCmd = &cobra.Command{
-	Use:   "comment [mr-id]",
-	Short: "Create a comment on a GitLab Merge Request. If no MR ID is provided, it attempts to get it from the CI context.",
+	Use:   "update-mr [mr-id]",
+	Short: "Add the SYAC release checklist to a GitLab Merge Request description. If no MR ID is provided, it attempts to get it from the CI context.",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var mrID string
@@ -31,16 +32,35 @@ var commentCmd = &cobra.Command{
 			mrID = ctx.MRID
 		}
 
-		if err := gitlabClient.MergeRequests.CreateMergeRequestComment(mrID); err != nil {
-			if strings.Contains(err.Error(), "comment already exists") {
-				fmt.Printf("Comment already exists on MR %s. Skipping.\n", mrID)
-			} else {
-				fmt.Fprintf(os.Stderr, "Error creating comment: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			fmt.Printf("Comment created successfully on MR %s\n", mrID)
+		// Read the embedded markdown checklist content
+		contentBytes, err := assets.MrCommentContent.ReadFile("mr_comment.md")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading mr_comment.md: %v\n", err)
+			os.Exit(1)
 		}
+		newBlock := string(contentBytes)
+
+		// Fetch the existing description
+		description, err := gitlabClient.MergeRequests.GetMergeRequestDescription(mrID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error fetching MR description: %v\n", err)
+			os.Exit(1)
+		}
+
+		if strings.Contains(description, "[SYAC]") || strings.Contains(description, "<!-- syac:release-type -->") {
+			fmt.Printf("MR %s already contains the SYAC checklist. Skipping update.\n", mrID)
+			return
+		}
+
+		// Append the checklist to the existing description
+		updated := strings.TrimSpace(description) + "\n\n" + newBlock
+
+		if err := gitlabClient.MergeRequests.UpdateMergeRequestDescription(mrID, updated); err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating MR description: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("SYAC checklist successfully injected into MR %s description.\n", mrID)
 	},
 }
 

@@ -33,11 +33,11 @@ build_binary:
 # -----------------------------------------------
 # Post version bump comment in MRs
 # -----------------------------------------------
-comment_bump_selector:
+update_mr_description:
   stage: setup
   image: registry.simulogix.com/personal-websites/syac/feature/syac:latest
   script:
-    - syac comment
+    - syac update-mr
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
@@ -54,7 +54,6 @@ build_feature:
     PUSH_IMAGE: "false"
   script:
     - syac context
-    - syac release --ref main --bump major --dry-run
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
@@ -67,6 +66,8 @@ build_dev:
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
     PUSH_IMAGE: "true"
+  script:
+    - syac context
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
