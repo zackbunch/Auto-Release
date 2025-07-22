@@ -1,3 +1,12 @@
+include:
+  - project: 'personal-websites/pipeline-templates'
+    ref: 'main'
+    file: '/.ci-templates/docker.gitlab-ci.yml'
+
+variables:
+  SHORT_SHA: $CI_COMMIT_SHORT_SHA
+  APP_NAME: syaccli
+
 stages:
   - setup      # compile + comment logic
   - build      # image build
