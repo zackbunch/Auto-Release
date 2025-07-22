@@ -29,23 +29,6 @@ build_binary:
     paths:
       - syac
     expire_in: 1 hour
-  when: always
-
-# -----------------------------------------------
-# Post version bump comment in MRs
-# -----------------------------------------------
-update_mr_description:
-  stage: setup
-  extends: [.build-dind, .build-common]
-  needs:
-    - job: build_binary
-  dependencies:
-    - build_binary
-  script:
-    - ./syac update-mr
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
 
 # -----------------------------------------------
 # Build on feature branches — gmarm-* (no push) 
@@ -53,15 +36,9 @@ update_mr_description:
 build_feature:
   stage: build
   extends: [.build-dind, .build-common]
-  needs:
-    - job: build_binary
-  dependencies:
-    - build_binary
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/feature/$CI_COMMIT_REF_NAME"
     PUSH_IMAGE: "false"
-  script:
-    - ./syac context
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
@@ -71,15 +48,9 @@ build_feature:
 build_dev:
   stage: build
   extends: [.build-dind, .build-common]
-  needs:
-    - job: build_binary
-  dependencies:
-    - build_binary
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
     PUSH_IMAGE: "true"
-  script:
-    - ./syac context
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
