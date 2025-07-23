@@ -1,13 +1,17 @@
 package gitlab
 
 type Tag struct {
-	Name string `json:"name"`
+	Name   string `json:"name"`
+	Target string `json:"target,omitempty"` // Commit SHA or tag target
+	WebURL string `json:"web_url,omitempty"`
 }
 
 type MergeRequest struct {
 	IID            int    `json:"iid"`
 	Title          string `json:"title"`
 	MergeCommitSHA string `json:"merge_commit_sha"`
+	State          string `json:"state,omitempty"` // opened, closed, merged
+	WebURL         string `json:"web_url,omitempty"`
 }
 
 type ProtectedBranch struct {
@@ -23,5 +27,6 @@ type Release struct {
 	Ref          string `json:"ref,omitempty"`        // commit SHA or branch/tag
 	Committer    string `json:"committer,omitempty"`  // name/email if available
 	IsDraft      bool   `json:"draft,omitempty"`      // pre-release state
-	IsPreRelease bool   `json:"prerelease,omitempty"` // semantic pre-release flag (v1.2.3-beta.1)
+	IsPreRelease bool   `json:"prerelease,omitempty"` // semantic pre-release flag
+	WebURL       string `json:"web_url,omitempty"`    // GitLab release page
 }
