@@ -14,31 +14,14 @@ type MergeRequestsService interface {
 	GetMergeRequestDescription(mrID string) (string, error)
 	UpdateMergeRequestDescription(mrID string, newDescription string) error
 	CreateMergeRequestComment(mrID string) error
-	GetMergeRequestNotes(mrID string) ([]MergeRequestNote, error)
 	GetVersionBump(mrID string) (version.VersionType, error)
 	GetMergeRequestForCommit(sha string) (MergeRequest, error)
-	GetMR(mrID string) (MergeRequest, error)
 }
 
 // mrsService is a concrete implementation of MergeRequestsService.
 // It holds a reference to the base Client to make API calls.
 type mrsService struct {
 	client *Client // A reference to the base GitLab client
-}
-
-func (s *mrsService) GetMR(mrID string) (MergeRequest, error) {
-	path := fmt.Sprintf("/projects/%s/merge_requests/%s", urlEncode(s.client.projectID), mrID)
-	respData, err := s.client.DoRequest("GET", path, nil)
-	if err != nil {
-		return MergeRequest{}, fmt.Errorf("failed to get merge request: %w", err)
-	}
-
-	var mr MergeRequest
-	if err := json.Unmarshal(respData, &mr); err != nil {
-		return MergeRequest{}, fmt.Errorf("failed to unmarshal merge request: %w", err)
-	}
-
-	return mr, nil
 }
 
 // GetMergeRequestDescription implements the MergeRequestsService interface.
@@ -62,34 +45,12 @@ func (s *mrsService) GetMergeRequestDescription(mrID string) (string, error) {
 	return mr.Description, nil
 }
 
-func (s *mrsService) hasComment(mrID string) (bool, error) {
-	notes, err := s.GetMergeRequestNotes(mrID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get merge request notes: %w", err)
-	}
-	// Check if any note contains the SYAC comment marker
-	for _, note := range notes {
-		if strings.Contains(note.Body, "[SYAC]") {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (s *mrsService) CreateMergeRequestComment(mrID string) error {
 	contentBytes, err := assets.MrCommentContent.ReadFile("mr_comment.md")
 	if err != nil {
 		return fmt.Errorf("failed to read embedded mr_comment.md: %w", err)
 	}
 	content := string(contentBytes)
-
-	exists, err := s.hasComment(mrID)
-	if err != nil {
-		return fmt.Errorf("failed to check for existing comment: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("comment already exists on MR %s", mrID)
-	}
 
 	path := fmt.Sprintf("/projects/%s/merge_requests/%s/notes", urlEncode(s.client.projectID), mrID)
 	payload := map[string]string{"body": content}
@@ -100,23 +61,6 @@ func (s *mrsService) CreateMergeRequestComment(mrID string) error {
 	}
 
 	return nil
-}
-
-// GetMergeRequestNotes returns all user comments on a given merge request
-func (s *mrsService) GetMergeRequestNotes(mrID string) ([]MergeRequestNote, error) {
-	path := fmt.Sprintf("/projects/%s/merge_requests/%s/notes", urlEncode(s.client.projectID), mrID)
-
-	respData, err := s.client.DoRequest("GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var notes []MergeRequestNote
-	if err := json.Unmarshal(respData, &notes); err != nil {
-		return nil, fmt.Errorf("failed to parse merge request notes: %w", err)
-	}
-
-	return notes, nil
 }
 
 // ParseVersionBump scans the string for a SYAC version checkbox
@@ -143,19 +87,7 @@ func (s *mrsService) GetVersionBump(mrID string) (version.VersionType, error) {
 		return bumpType, nil
 	}
 
-	// If not found in description, check the comments from newest to oldest
-	notes, err := s.GetMergeRequestNotes(mrID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get merge request notes: %w", err)
-	}
-
-	for i := len(notes) - 1; i >= 0; i-- {
-		if bumpType, found := ParseVersionBump(notes[i].Body); found {
-			return bumpType, nil
-		}
-	}
-
-	fmt.Println("WARNING: No version type checkbox checked in MR description or comments. Defaulting to Patch.")
+	fmt.Println("WARNING: No version type checkbox checked in MR description. Defaulting to Patch.")
 	return version.Patch, nil
 }
 

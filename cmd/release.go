@@ -16,13 +16,14 @@ var (
 	releaseDescription string
 )
 
-// releaseCmd triggers the release process using the specified options.
 var releaseCmd = &cobra.Command{
 	Use:   "release",
-	Short: "Create a new release.",
-	Long: `Creates a new GitLab release by determining the next version 
-(either explicitly via --bump or inferred from the MR context), tagging the commit, 
-and publishing the release with optional name and description.`,
+	Short: "Release-related commands like creating releases, tagging, or bumping versions.",
+}
+
+var releaseCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new GitLab release.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var bumpType version.VersionType
 		var err error
@@ -62,12 +63,42 @@ and publishing the release with optional name and description.`,
 	},
 }
 
-func init() {
-	releaseCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run without making any changes.")
-	releaseCmd.Flags().StringVar(&bump, "bump", "", "Version bump type: patch, minor, or major. If not provided, it will be determined from the merge request.")
-	releaseCmd.Flags().StringVar(&ref, "ref", "", "Git commit SHA or branch to create the release from.")
-	releaseCmd.Flags().StringVar(&releaseName, "name", "", "Optional release name. Defaults to the version.")
-	releaseCmd.Flags().StringVar(&releaseDescription, "description", "", "Optional release description.")
+var releaseInferCmd = &cobra.Command{
+	Use:   "infer-bump",
+	Short: "Print the inferred version bump from the MR context.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, err := ci.LoadContext(dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to load CI context: %w", err)
+		}
 
+		if ctx.MRID == "" {
+			return fmt.Errorf("no merge request ID found in CI context")
+		}
+
+		bump, err := gitlabClient.MergeRequests.GetVersionBump(ctx.MRID)
+		if err != nil {
+			return fmt.Errorf("failed to infer bump: %w", err)
+		}
+
+		fmt.Println(bump)
+		return nil
+	},
+}
+
+func init() {
+	// Common flags for `release create`
+	releaseCreateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run without making any changes.")
+	releaseCreateCmd.Flags().StringVar(&bump, "bump", "", "Version bump type: patch, minor, or major.")
+	releaseCreateCmd.Flags().StringVar(&ref, "ref", "", "Git commit SHA or branch to create the release from.")
+	releaseCreateCmd.Flags().StringVar(&releaseName, "name", "", "Optional release name. Defaults to the version.")
+	releaseCreateCmd.Flags().StringVar(&releaseDescription, "description", "", "Optional release description.")
+
+	// Optional dry-run for `infer-bump`
+	releaseInferCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run without making any changes.")
+
+	// Wire it up
+	releaseCmd.AddCommand(releaseCreateCmd)
+	releaseCmd.AddCommand(releaseInferCmd)
 	rootCmd.AddCommand(releaseCmd)
 }
