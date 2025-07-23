@@ -118,3 +118,66 @@ func TestString(t *testing.T) {
 		t.Errorf("expected %q, got %q", want, got)
 	}
 }
+
+func TestLessThan(t *testing.T) {
+	tests := []struct {
+		a, b Version
+		want bool
+	}{
+		{Version{1, 0, 0}, Version{1, 0, 1}, true},
+		{Version{1, 2, 0}, Version{1, 3, 0}, true},
+		{Version{1, 2, 3}, Version{2, 0, 0}, true},
+		{Version{2, 0, 0}, Version{1, 2, 3}, false},
+		{Version{1, 2, 3}, Version{1, 2, 3}, false},
+	}
+
+	for _, tt := range tests {
+		got := tt.a.LessThan(tt.b)
+		if got != tt.want {
+			t.Errorf("LessThan(%v, %v) = %v; want %v", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
+func TestParseVersionType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected VersionType
+		hasError bool
+	}{
+		{"major", Major, false},
+		{"minor", Minor, false},
+		{"patch", Patch, false},
+		{"MAJOR", Major, false},
+		{"unknown", "", true},
+	}
+
+	for _, tt := range tests {
+		got, err := ParseVersionType(tt.input)
+		if tt.hasError && err == nil {
+			t.Errorf("ParseVersionType(%q) expected error, got none", tt.input)
+		}
+		if !tt.hasError && got != tt.expected {
+			t.Errorf("ParseVersionType(%q) = %q; want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestVersionTypeString(t *testing.T) {
+	tests := []struct {
+		v    VersionType
+		want string
+	}{
+		{Major, "Major"},
+		{Minor, "Minor"},
+		{Patch, "Patch"},
+		{VersionType("unknown"), "unknown"},
+	}
+
+	for _, tt := range tests {
+		got := tt.v.String()
+		if got != tt.want {
+			t.Errorf("VersionType(%q).String() = %q; want %q", tt.v, got, tt.want)
+		}
+	}
+}
