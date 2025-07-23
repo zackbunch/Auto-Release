@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"syac/internal/ci"
 	"syac/internal/version"
@@ -89,6 +90,10 @@ var releaseInferCmd = &cobra.Command{
 }
 
 func resolveMRID(dryRun bool) (string, error) {
+	if mrID := os.Getenv("CI_MERGE_REQUEST_IID"); mrID != "" {
+		return mrID, nil
+	}
+
 	ctx, err := ci.LoadContext(dryRun)
 	if err == nil && ctx.MRID != "" {
 		return ctx.MRID, nil
