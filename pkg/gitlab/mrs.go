@@ -16,6 +16,7 @@ type MergeRequestsService interface {
 	CreateMergeRequestComment(mrID string) error
 	GetVersionBump(mrID string) (version.VersionType, error)
 	GetMergeRequestForCommit(sha string) (MergeRequest, error)
+	GetLatestMergeRequest() (MergeRequest, error)
 }
 
 // mrsService is a concrete implementation of MergeRequestsService.
@@ -123,4 +124,23 @@ func (s *mrsService) UpdateMergeRequestDescription(mrID string, newDescription s
 	}
 
 	return nil
+}
+
+func (s *mrsService) GetLatestMergeRequest() (MergeRequest, error) {
+	path := fmt.Sprintf("/projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=1", urlEncode(s.client.projectID))
+	respData, err := s.client.DoRequest("GET", path, nil)
+	if err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to fetch latest open merge request: %w", err)
+	}
+
+	var mrs []MergeRequest
+	if err := json.Unmarshal(respData, &mrs); err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to unmarshal latest open merge request: %w", err)
+	}
+
+	if len(mrs) == 0 {
+		return MergeRequest{}, fmt.Errorf("no open merge requests found")
+	}
+
+	return mrs[0], nil
 }

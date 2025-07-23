@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 	"syac/internal/ci"
 	"syac/internal/version"
 
@@ -34,20 +35,20 @@ var releaseCreateCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			ctx, err := ci.LoadContext(dryRun)
+			mrID, err := resolveMRID(dryRun)
 			if err != nil {
-				return fmt.Errorf("failed to load CI context: %w", err)
-			}
-
-			if ctx.MRID != "" {
-				bumpType, err = gitlabClient.MergeRequests.GetVersionBump(ctx.MRID)
+				fmt.Printf("[release] Warning: %v. Defaulting to Patch bump.\n", err)
+				bumpType = version.Patch
+			} else if mrID == "" {
+				fmt.Println("[release] Dry run: no MR context available. Defaulting to Patch bump.")
+				bumpType = version.Patch
+			} else {
+				fmt.Printf("[release] Using MR #%s to determine bump.\n", mrID)
+				bumpType, err = gitlabClient.MergeRequests.GetVersionBump(mrID)
 				if err != nil {
-					fmt.Printf("[release] Warning: Failed to determine bump from MR %s: %v. Defaulting to Patch.\n", ctx.MRID, err)
+					fmt.Printf("[release] Warning: Failed to determine bump from MR %s: %v. Defaulting to Patch.\n", mrID, err)
 					bumpType = version.Patch
 				}
-			} else {
-				fmt.Println("[release] Warning: No MR ID found. Defaulting to Patch bump.")
-				bumpType = version.Patch
 			}
 		}
 
@@ -67,23 +68,41 @@ var releaseInferCmd = &cobra.Command{
 	Use:   "infer-bump",
 	Short: "Print the inferred version bump from the MR context.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, err := ci.LoadContext(dryRun)
+		mrID, err := resolveMRID(dryRun)
 		if err != nil {
-			return fmt.Errorf("failed to load CI context: %w", err)
+			return fmt.Errorf("failed to resolve MR ID: %w", err)
+		}
+		if mrID == "" {
+			fmt.Println("Dry run mode with no MR ID. Defaulting to patch.")
+			fmt.Println("patch")
+			return nil
 		}
 
-		if ctx.MRID == "" {
-			return fmt.Errorf("no merge request ID found in CI context")
-		}
-
-		bump, err := gitlabClient.MergeRequests.GetVersionBump(ctx.MRID)
+		bump, err := gitlabClient.MergeRequests.GetVersionBump(mrID)
 		if err != nil {
-			return fmt.Errorf("failed to infer bump: %w", err)
+			return fmt.Errorf("failed to infer bump from MR %s: %w", mrID, err)
 		}
 
 		fmt.Println(bump)
 		return nil
 	},
+}
+
+func resolveMRID(dryRun bool) (string, error) {
+	ctx, err := ci.LoadContext(dryRun)
+	if err == nil && ctx.MRID != "" {
+		return ctx.MRID, nil
+	}
+
+	if dryRun {
+		return "", nil
+	}
+
+	mr, err := gitlabClient.MergeRequests.GetLatestMergeRequest()
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest open merge request: %w", err)
+	}
+	return strconv.Itoa(mr.IID), nil
 }
 
 func init() {

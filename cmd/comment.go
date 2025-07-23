@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"syac/internal/assets"
@@ -13,7 +14,7 @@ import (
 
 var commentCmd = &cobra.Command{
 	Use:   "update-mr [mr-id]",
-	Short: "Add the SYAC release checklist to a GitLab Merge Request description. If no MR ID is provided, it attempts to get it from the CI context.",
+	Short: "Add the SYAC release checklist to a GitLab Merge Request description. If no MR ID is provided, it attempts to get it from the CI context, or falls back to the latest open MR.",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var mrID string
@@ -25,11 +26,16 @@ var commentCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "Error loading CI context: %v\n", err)
 				os.Exit(1)
 			}
-			if ctx.MRID == "" {
-				fmt.Fprintf(os.Stderr, "Error: No Merge Request ID provided and could not be determined from CI context.\n")
-				os.Exit(1)
+			if ctx.MRID != "" {
+				mrID = ctx.MRID
+			} else {
+				mr, err := gitlabClient.MergeRequests.GetLatestMergeRequest()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: No Merge Request ID provided and could not be determined from CI context or the latest open MR: %v\n", err)
+					os.Exit(1)
+				}
+				mrID = strconv.Itoa(mr.IID)
 			}
-			mrID = ctx.MRID
 		}
 
 		// Read the embedded markdown checklist content

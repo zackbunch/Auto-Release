@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -9,13 +10,22 @@ import (
 // bumpCmd handles version bumping based on merge request metadata.
 var bumpCmd = &cobra.Command{
 	Use:   "bump [mr-id]",
-	Short: "Bump version based on merge request description.",
+	Short: "Bump version based on merge request description. If mr-id is not provided, the latest open MR will be used.",
 	Long: `Analyzes the given merge request for version bump checkboxes 
 (e.g., Patch, Minor, Major), computes the next version based on the 
 latest tag, and prints the bump result.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mrID := args[0]
+		var mrID string
+		if len(args) > 0 {
+			mrID = args[0]
+		} else {
+			mr, err := gitlabClient.MergeRequests.GetLatestMergeRequest()
+			if err != nil {
+				return fmt.Errorf("failed to get latest merge request: %w", err)
+			}
+			mrID = strconv.Itoa(mr.IID)
+		}
 
 		bumpType, err := gitlabClient.MergeRequests.GetVersionBump(mrID)
 		if err != nil {
