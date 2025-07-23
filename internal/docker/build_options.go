@@ -8,42 +8,45 @@ import (
 	"syac/internal/ci"
 )
 
+// BuildOptions defines all configuration required to build a Docker image.
+// This struct is typically constructed from CI/CD environment variables and pipeline context.
 type BuildOptions struct {
-	Dockerfile     string
-	ContextPath    string
-	ExtraBuildArgs []string
-	ImageName      string
-	TargetTag      string
-	FullImages     []string
-	Push           bool
-	DryRun         bool
+	Dockerfile     string   // Path to the Dockerfile to use (default: "Dockerfile")
+	ContextPath    string   // Build context directory (default: ".")
+	ExtraBuildArgs []string // Additional --build-arg entries passed to docker build
+	ImageName      string   // Application name, used for tagging
+	TargetTag      string   // Git SHA or release tag used as the version tag
+	FullImages     []string // Full docker image names to tag the built image with
+	Push           bool     // Whether to push the image after build (controlled via SYAC_PUSH)
+	DryRun         bool     // If true, log commands instead of executing (useful for debugging)
 }
 
-// BuildOptionsFromContext constructs BuildOptions based on the CI context.
+// BuildOptionsFromContext extracts and constructs a BuildOptions instance from CI context and env vars.
+// This enforces consistent tagging and context conventions across all repositories.
 func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
-	// Determine Dockerfile
+	// Determine Dockerfile path (default: "Dockerfile")
 	dockerfile := os.Getenv("SYAC_DOCKERFILE")
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
 	}
 
-	// Determine build context
+	// Determine Docker build context (default: ".")
 	buildContext := os.Getenv("SYAC_BUILD_CONTEXT")
 	if buildContext == "" {
 		buildContext = "."
 	}
 
-	// Parse extra build args
+	// Optional: Extra build arguments passed via --build-arg
 	extraArgs := strings.Fields(os.Getenv("SYAC_BUILD_EXTRA_ARGS"))
 
-	// Application name and SHA tag
+	// Determine image name and SHA tag
 	appName := ctx.ApplicationName
 	sha := ctx.ShortSHA
 
-	// Determine OpenShift environment
+	// Resolve OpenShift target environment
 	env := deriveOpenShiftEnv(ctx)
 
-	// Generate all image tags (immutable + floating)
+	// Generate image tags based on context
 	fullImages := generateBuildTags(ctx, env, appName, sha)
 
 	return &BuildOptions{
@@ -58,7 +61,7 @@ func BuildOptionsFromContext(ctx ci.Context) (*BuildOptions, error) {
 	}, nil
 }
 
-// deriveOpenShiftEnv maps branch context to OpenShift environment
+// deriveOpenShiftEnv returns the appropriate OpenShift namespace/environment based on branch context.
 func deriveOpenShiftEnv(ctx ci.Context) string {
 	if ctx.IsTag {
 		return "prod"
@@ -78,29 +81,27 @@ func deriveOpenShiftEnv(ctx ci.Context) string {
 	}
 }
 
-// generateBuildTags returns both immutable and floating tags
-// for the given context, environment, application name, and SHA.
+// generateBuildTags returns Docker image tags for this build, based on CI context.
+// Ensures consistent tagging patterns across RCs, features, and stable branches.
 func generateBuildTags(ctx ci.Context, env, appName, sha string) []string {
-	// For RC builds, drop the env segment entirely:
+	// For dev merge requests, treat as release candidates
 	if ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev" {
 		base := fmt.Sprintf("%s/%s", ctx.RegistryImage, appName)
-		rcTag := fmt.Sprintf("rc-%s", sha)
 		return []string{
-			fmt.Sprintf("%s:%s", base, rcTag), // e.g. registry/.../app:rc-abc123
-			fmt.Sprintf("%s:rc-latest", base), // e.g. registry/.../app:rc-latest
+			fmt.Sprintf("%s:rc-%s", base, sha), // immutable tag (e.g. rc-a1b2c3d)
+			fmt.Sprintf("%s:rc-latest", base),  // floating tag (e.g. rc-latest)
 		}
 	}
 
-	// Otherwise, include the env folder as before:
+	// Feature branches go under /env/app/branch:sha
 	base := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
 	if ctx.IsFeatureBranch {
-		// feature branches get their own folder under the env
 		return []string{
 			fmt.Sprintf("%s/%s:%s", base, ctx.RefName, sha),
 		}
 	}
 
-	// default: one immutable tag in its env
+	// Default tagging for non-feature environments
 	return []string{
 		fmt.Sprintf("%s:%s", base, sha),
 	}

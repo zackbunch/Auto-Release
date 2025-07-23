@@ -7,28 +7,34 @@ import (
 	"syac/pkg/gitlab"
 )
 
+// Context captures the relevant CI/CD environment state for SYAC's execution.
+// It infers execution context from GitLab-provided CI variables (e.g., MR, tag, feature branch).
 type Context struct {
-	Source                   string
-	RefName                  string
-	SHA                      string
-	ShortSHA                 string
-	MRID                     string
-	Tag                      string
-	ProjectPath              string
-	RegistryImage            string
-	DefaultBranch            string
-	Sprint                   string
-	ForcePush                bool
-	ApplicationName          string
-	DryRun                   bool
-	MergeRequestTargetBranch string
+	// GitLab CI/CD metadata
+	Source                   string // CI_PIPELINE_SOURCE
+	RefName                  string // CI_COMMIT_REF_NAME
+	SHA                      string // CI_COMMIT_SHA
+	ShortSHA                 string // CI_COMMIT_SHORT_SHA
+	MRID                     string // CI_MERGE_REQUEST_IID
+	Tag                      string // CI_COMMIT_TAG
+	ProjectPath              string // CI_PROJECT_PATH
+	RegistryImage            string // CI_REGISTRY_IMAGE
+	DefaultBranch            string // CI_DEFAULT_BRANCH
+	Sprint                   string // SYAC_SPRINT
+	ForcePush                bool   // SYAC_FORCE_PUSH
+	ApplicationName          string // SYAC_APPLICATION_NAME or derived from RegistryImage
+	DryRun                   bool   // CLI --dry-run flag
+	MergeRequestTargetBranch string // CI_MERGE_REQUEST_TARGET_BRANCH_NAME
 
-	IsMergeRequest  bool
-	IsTag           bool
-	IsFeatureBranch bool
-	IsDefaultBranch bool
+	// Derived booleans
+	IsMergeRequest  bool // true if CI_PIPELINE_SOURCE == "merge_request_event"
+	IsTag           bool // true if CI_COMMIT_TAG is non-empty
+	IsFeatureBranch bool // true if RefName starts with "gmarm-"
+	IsDefaultBranch bool // true if RefName equals CI_DEFAULT_BRANCH
 }
 
+// LoadContext constructs a CI Context by reading GitLab CI/CD environment variables.
+// It infers flags like IsMergeRequest, IsTag, etc., and safely derives ApplicationName.
 func LoadContext(dryRun bool) (Context, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
 	tag := os.Getenv("CI_COMMIT_TAG")
@@ -63,6 +69,8 @@ func LoadContext(dryRun bool) (Context, error) {
 	}, nil
 }
 
+// PrintSummary emits a full CI/CD context report for debugging or transparency during the pipeline.
+// It queries GitLab for the latest release metadata if available.
 func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Println("CI/CD Environment Summary")
 	fmt.Println("--------------------------")
@@ -85,7 +93,6 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Force Push            : %t\n", c.ForcePush)
 	fmt.Printf("  Application Name      : %s\n", c.ApplicationName)
 
-	// Add latest release
 	latestRelease, err := client.Releases.GetLatestRelease()
 	if err != nil {
 		fmt.Printf("  Latest Release        : No Release Yet (%v)\n", err)
@@ -98,6 +105,7 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Println()
 }
 
+// describeContext returns a human-readable string summarizing the current CI/CD pipeline context.
 func (c Context) describeContext() string {
 	switch {
 	case c.IsMergeRequest:
