@@ -127,7 +127,7 @@ func (s *mrsService) UpdateMergeRequestDescription(mrID string, newDescription s
 }
 
 func (s *mrsService) GetLatestMergeRequest() (MergeRequest, error) {
-	path := fmt.Sprintf("/projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=1", urlEncode(s.client.projectID))
+	path := fmt.Sprintf("/projects/%s/merge_requests?&order_by=created_at&sort=desc&per_page=1", urlEncode(s.client.projectID))
 	respData, err := s.client.DoRequest("GET", path, nil)
 	if err != nil {
 		return MergeRequest{}, fmt.Errorf("failed to fetch latest open merge request: %w", err)
