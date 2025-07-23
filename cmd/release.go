@@ -84,7 +84,16 @@ var releaseInferCmd = &cobra.Command{
 			return fmt.Errorf("failed to infer bump from MR %s: %w", mrID, err)
 		}
 
-		fmt.Println(bump)
+		current, next, err := gitlabClient.Tags.GetNextVersion(bump)
+		if err != nil {
+			return fmt.Errorf("failed to calculate next version: %w", err)
+		}
+
+		fmt.Printf("[release] Current: %s\n", current)
+		fmt.Printf("[release] Bump:    %s\n", bump)
+		fmt.Printf("[release] Next:    %s\n", next)
+		fmt.Println(next.String())
+
 		return nil
 	},
 }
