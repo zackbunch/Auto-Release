@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+func (vt VersionType) String() string {
+	return string(vt)
+}
+
 // VersionType represents a semantic version bump level
 type VersionType string
 

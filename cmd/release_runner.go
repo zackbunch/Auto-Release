@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"syac/internal/ci"
 	"syac/internal/version"
 	"syac/pkg/gitlab"
 )
 
+// ReleaseOptions encapsulates input to the release command.
 type ReleaseOptions struct {
 	DryRun      bool
 	Bump        string
@@ -16,6 +16,7 @@ type ReleaseOptions struct {
 	GitLab      *gitlab.Client
 }
 
+// RunRelease performs a version bump and creates a GitLab release.
 func RunRelease(opts ReleaseOptions) error {
 	if opts.GitLab == nil {
 		return fmt.Errorf("GitLab client is not initialized")
@@ -30,56 +31,34 @@ func RunRelease(opts ReleaseOptions) error {
 		}
 	}
 
-	var bumpType version.VersionType
-	if opts.Bump != "" {
-		parsedBumpType, err := version.ParseVersionType(opts.Bump)
-		if err != nil {
-			return err
-		}
-		bumpType = parsedBumpType
-	} else {
-		// Try to get bump type from MR description if not explicitly provided
-		ctx, err := ci.LoadContext(opts.DryRun)
-		if err != nil {
-			return fmt.Errorf("failed to load CI context: %w", err)
-		}
-
-		if ctx.MRID != "" {
-			mrBumpType, err := opts.GitLab.MergeRequests.GetVersionBump(ctx.MRID)
-			if err != nil {
-				fmt.Printf("Warning: Failed to get version bump from MR %s description: %v. Defaulting to Patch.\n", ctx.MRID, err)
-				bumpType = version.Patch
-			} else {
-				bumpType = mrBumpType
-			}
-		} else {
-			fmt.Println("Warning: No explicit bump type provided and no MR ID found in CI context. Defaulting to Patch.")
-			bumpType = version.Patch
-		}
+	bumpType, err := version.ParseVersionType(opts.Bump)
+	if err != nil {
+		return err
 	}
 
+	// Compute next version based on current tags.
 	current, next, err := opts.GitLab.Tags.GetNextVersion(bumpType)
 	if err != nil {
-		return fmt.Errorf("failed to determine next version: %w", err)
+		return fmt.Errorf("failed to compute next version: %w", err)
 	}
 
 	if opts.DryRun {
-		fmt.Printf("[release] Dry run: current=%s next=%s bump=%s\n", current, next, bumpType)
+		fmt.Printf("[release] Dry run:\n  Current: %s\n  Next:    %s\n  Bump:    %s\n", current, next, bumpType)
 		return nil
 	}
 
+	// Use the computed version if no release name is given.
 	name := opts.Name
 	if name == "" {
 		name = next.String()
 	}
 
-	fmt.Printf("[release] Creating release %s from ref %s\n", name, opts.Ref)
-
-	err = opts.GitLab.Releases.CreateRelease(next.String(), opts.Ref, name, opts.Description)
-	if err != nil {
+	fmt.Printf("[release] Creating release %q from ref %q...\n", name, opts.Ref)
+	if err := opts.GitLab.Releases.CreateRelease(next.String(), opts.Ref, name, opts.Description); err != nil {
 		return fmt.Errorf("failed to create release: %w", err)
 	}
 
-	fmt.Printf("[release] Successfully created release %s\n", name)
+	fmt.Printf("[release] Successfully created release: %s\n", name)
 	return nil
 }
+

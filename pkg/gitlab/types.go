@@ -9,8 +9,9 @@ type Tag struct {
 }
 
 type MergeRequest struct {
-	IID   int    `json:"iid"`
-	Title string `json:"title"`
+	IID            int    `json:"iid"`
+	Title          string `json:"title"`
+	MergeCommitSHA string `json:"merge_commit_sha"`
 }
 
 type ProtectedBranch struct {

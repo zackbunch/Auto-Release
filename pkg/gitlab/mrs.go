@@ -17,12 +17,28 @@ type MergeRequestsService interface {
 	GetMergeRequestNotes(mrID string) ([]MergeRequestNote, error)
 	GetVersionBump(mrID string) (version.VersionType, error)
 	GetMergeRequestForCommit(sha string) (MergeRequest, error)
+	GetMR(mrID string) (MergeRequest, error)
 }
 
 // mrsService is a concrete implementation of MergeRequestsService.
 // It holds a reference to the base Client to make API calls.
 type mrsService struct {
 	client *Client // A reference to the base GitLab client
+}
+
+func (s *mrsService) GetMR(mrID string) (MergeRequest, error) {
+	path := fmt.Sprintf("/projects/%s/merge_requests/%s", urlEncode(s.client.projectID), mrID)
+	respData, err := s.client.DoRequest("GET", path, nil)
+	if err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to get merge request: %w", err)
+	}
+
+	var mr MergeRequest
+	if err := json.Unmarshal(respData, &mr); err != nil {
+		return MergeRequest{}, fmt.Errorf("failed to unmarshal merge request: %w", err)
+	}
+
+	return mr, nil
 }
 
 // GetMergeRequestDescription implements the MergeRequestsService interface.
@@ -103,32 +119,44 @@ func (s *mrsService) GetMergeRequestNotes(mrID string) ([]MergeRequestNote, erro
 	return notes, nil
 }
 
-// ParseVersionFromDescription scans the MR description for a SYAC version checkbox
-func ParseVersionFromDescription(description string) (version.VersionType, error) {
+// ParseVersionBump scans the string for a SYAC version checkbox
+func ParseVersionBump(description string) (version.VersionType, bool) {
 	checkboxRe := regexp.MustCompile(`- \[x\] \*\*(Patch|Minor|Major)\*\*`)
 	lines := strings.Split(description, "\n")
 	for _, line := range lines {
 		if matches := checkboxRe.FindStringSubmatch(line); len(matches) > 1 {
-			return version.VersionType(matches[1]), nil
+			return version.VersionType(matches[1]), true
 		}
 	}
 
-	fmt.Println("WARNING: No version type checkbox checked in MR description. Defaulting to Patch.")
-	return "Patch", nil
+	return "", false
 }
 
 func (s *mrsService) GetVersionBump(mrID string) (version.VersionType, error) {
+	// Try to get bump type from MR description first
 	description, err := s.GetMergeRequestDescription(mrID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get MR description: %w", err)
 	}
 
-	bumpType, err := ParseVersionFromDescription(description)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse version from description: %w", err)
+	if bumpType, found := ParseVersionBump(description); found {
+		return bumpType, nil
 	}
 
-	return bumpType, nil
+	// If not found in description, check the comments from newest to oldest
+	notes, err := s.GetMergeRequestNotes(mrID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get merge request notes: %w", err)
+	}
+
+	for i := len(notes) - 1; i >= 0; i-- {
+		if bumpType, found := ParseVersionBump(notes[i].Body); found {
+			return bumpType, nil
+		}
+	}
+
+	fmt.Println("WARNING: No version type checkbox checked in MR description or comments. Defaulting to Patch.")
+	return version.Patch, nil
 }
 
 func (s *mrsService) GetMergeRequestForCommit(sha string) (MergeRequest, error) {
