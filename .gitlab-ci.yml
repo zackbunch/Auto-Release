@@ -8,7 +8,7 @@ variables:
   APP_NAME: syaccli
   GIT_DEPTH: 0
   SPRINT: 120
-  SYAC_IMAGE: alpine:latest
+  SYAC_IMAGE: docker:24.0.5
 
 
 stages:
