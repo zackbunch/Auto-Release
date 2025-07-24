@@ -33,6 +33,9 @@ build_binary:
     paths:
       - syac
     expire_in: 1 hour
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
+      when: on_success
 
 # ------------------------------------------------
 # Feature Branch Build
