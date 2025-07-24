@@ -41,6 +41,8 @@ build_binary:
 validate_mr:
   stage: setup
   image: $SYAC_IMAGE
+  needs:
+    - build_binary
   dependencies:
     - build_binary
   script:
