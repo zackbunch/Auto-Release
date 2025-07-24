@@ -30,8 +30,8 @@ type Context struct {
 	// Derived booleans
 	IsMergeRequest  bool // true if CI_PIPELINE_SOURCE == "merge_request_event"
 	IsTag           bool // true if CI_COMMIT_TAG is non-empty
-	IsFeatureBranch     bool   // true if RefName starts with "gmarm-"
-	FeatureBranchPrefix string // SYAC_FEATURE_BRANCH_PREFIX or "gmarm-"
+	IsFeatureBranch     bool   // true if RefName starts with 
+	FeatureBranchPrefix string // SYAC_FEATURE_BRANCH_PREFIX 
 	IsDefaultBranch     bool   // true if RefName equals CI_DEFAULT_BRANCH
 }
 
