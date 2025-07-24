@@ -6,6 +6,9 @@ include:
 variables:
   SHORT_SHA: $CI_COMMIT_SHORT_SHA
   APP_NAME: syaccli
+  GIT_DEPTH: 0
+  SPRINT: 120
+
 
 stages:
   - setup      # compile + comment logic
@@ -30,17 +33,22 @@ build_binary:
       - syac
     expire_in: 1 hour
 
-# -----------------------------------------------
-# Build on feature branches — gmarm-* (no push) 
-# -----------------------------------------------
+# ------------------------------------------------
+# Feature Branch Build
+# ------------------------------------------------
 build_feature:
   stage: build
   extends: [.build-dind, .build-common]
+  image: $SYAC_IMAGE
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/feature/$CI_COMMIT_REF_NAME"
     PUSH_IMAGE: "false"
+  script:
+    - syac context
   rules:
-    - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
+      when: on_success
+
 
 # -----------------------------------------------
 # Build on dev — push SHA + latest
