@@ -44,8 +44,11 @@ build_feature:
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/feature/$CI_COMMIT_REF_NAME"
     PUSH_IMAGE: "false"
+  dependencies:
+    - build_binary
   script:
-    - syac context
+    - chmod +x ./syac
+    - ./syac context
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
       when: on_success
