@@ -106,21 +106,18 @@ release_dev:
       when: on_success
   script:
     - chmod +x ./syac
-
     - VERSION=$(./syac release infer-bump | tail -n1)
     - echo "Computed release version $VERSION"
     - echo "VERSION=$VERSION" >> version.env
 
-    - if [ -z "$VERSION" ]; then echo "Failed to infer version"; exit 1; fi
-
     - ./syac release create --ref "$CI_COMMIT_SHA" --description "Version $VERSION Release - Sprint $SPRINT"
 
     - docker pull "$IMAGE_ENV_PATH:$SHORT_SHA"
+    - docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$VERSION"
+    - docker push "$IMAGE_ENV_PATH:$VERSION"
 
-    - for tag in "$VERSION" "$CI_COMMIT_SHORT_SHA"; do
-        docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$tag"
-        docker push "$IMAGE_ENV_PATH:$tag"
-      done
+    - docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$CI_COMMIT_SHORT_SHA"
+    - docker push "$IMAGE_ENV_PATH:$CI_COMMIT_SHORT_SHA"
   artifacts:
     reports:
       dotenv: version.env
