@@ -30,8 +30,9 @@ type Context struct {
 	// Derived booleans
 	IsMergeRequest  bool // true if CI_PIPELINE_SOURCE == "merge_request_event"
 	IsTag           bool // true if CI_COMMIT_TAG is non-empty
-	IsFeatureBranch bool // true if RefName starts with "gmarm-"
-	IsDefaultBranch bool // true if RefName equals CI_DEFAULT_BRANCH
+	IsFeatureBranch     bool   // true if RefName starts with "gmarm-"
+	FeatureBranchPrefix string // SYAC_FEATURE_BRANCH_PREFIX or "gmarm-"
+	IsDefaultBranch     bool   // true if RefName equals CI_DEFAULT_BRANCH
 }
 
 // LoadContext constructs a CI Context by reading GitLab CI/CD environment variables.
@@ -40,6 +41,10 @@ func LoadContext(dryRun bool) (Context, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
 	tag := os.Getenv("CI_COMMIT_TAG")
 	defaultBranch := os.Getenv("CI_DEFAULT_BRANCH")
+	featureBranchPrefix := os.Getenv("SYAC_FEATURE_BRANCH_PREFIX")
+	if featureBranchPrefix == "" {
+		featureBranchPrefix = "gmarm-"
+	}
 
 	// Prefer APP_VERSION, fallback to CI_COMMIT_TAG
 	appVersion := os.Getenv("APP_VERSION")
@@ -62,7 +67,8 @@ func LoadContext(dryRun bool) (Context, error) {
 		Sprint:                   os.Getenv("SYAC_SPRINT"),
 		IsMergeRequest:           os.Getenv("CI_PIPELINE_SOURCE") == "merge_request_event",
 		IsTag:                    tag != "",
-		IsFeatureBranch:          strings.HasPrefix(ref, "gmarm-"),
+		IsFeatureBranch:          strings.HasPrefix(ref, featureBranchPrefix),
+		FeatureBranchPrefix:      featureBranchPrefix,
 		IsDefaultBranch:          ref == defaultBranch,
 		ForcePush:                os.Getenv("SYAC_FORCE_PUSH") == "true",
 		ApplicationName: func() string {

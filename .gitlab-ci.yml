@@ -6,6 +6,7 @@ include:
 variables:
   SHORT_SHA: $CI_COMMIT_SHORT_SHA
   APP_NAME: syaccli
+  SYAC_FEATURE_BRANCH_PREFIX: "gmarm-"
 
 stages:
   - setup      # compile + comment logic
@@ -40,7 +41,7 @@ build_feature:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/feature/$CI_COMMIT_REF_NAME"
     PUSH_IMAGE: "false"
   rules:
-    - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
+    - if: '$CI_COMMIT_REF_NAME =~ /^$SYAC_FEATURE_BRANCH_PREFIX\d+$/'
 
 # -----------------------------------------------
 # Build on dev — push SHA + latest
