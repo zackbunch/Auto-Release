@@ -18,6 +18,7 @@ type Context struct {
 	MRID                     string // CI_MERGE_REQUEST_IID
 	Tag                      string // CI_COMMIT_TAG
 	ProjectPath              string // CI_PROJECT_PATH
+	ApplicationVersion       string // APP_VERSION (or fallback to CI_COMMIT_TAG)
 	RegistryImage            string // CI_REGISTRY_IMAGE
 	DefaultBranch            string // CI_DEFAULT_BRANCH
 	Sprint                   string // SYAC_SPRINT
@@ -34,11 +35,17 @@ type Context struct {
 }
 
 // LoadContext constructs a CI Context by reading GitLab CI/CD environment variables.
-// It infers flags like IsMergeRequest, IsTag, etc., and safely derives ApplicationName.
+// It infers flags like IsMergeRequest, IsTag, etc., and safely derives ApplicationName and Version.
 func LoadContext(dryRun bool) (Context, error) {
 	ref := os.Getenv("CI_COMMIT_REF_NAME")
 	tag := os.Getenv("CI_COMMIT_TAG")
 	defaultBranch := os.Getenv("CI_DEFAULT_BRANCH")
+
+	// Prefer APP_VERSION, fallback to CI_COMMIT_TAG
+	appVersion := os.Getenv("APP_VERSION")
+	if appVersion == "" && tag != "" {
+		appVersion = tag
+	}
 
 	return Context{
 		Source:                   os.Getenv("CI_PIPELINE_SOURCE"),
@@ -49,6 +56,7 @@ func LoadContext(dryRun bool) (Context, error) {
 		MergeRequestTargetBranch: os.Getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
 		Tag:                      tag,
 		ProjectPath:              os.Getenv("CI_PROJECT_PATH"),
+		ApplicationVersion:       appVersion,
 		RegistryImage:            os.Getenv("CI_REGISTRY_IMAGE"),
 		DefaultBranch:            defaultBranch,
 		Sprint:                   os.Getenv("SYAC_SPRINT"),
@@ -92,6 +100,7 @@ func (c Context) PrintSummary(client *gitlab.Client) {
 	fmt.Printf("  Feature Branch        : %t\n", c.IsFeatureBranch)
 	fmt.Printf("  Force Push            : %t\n", c.ForcePush)
 	fmt.Printf("  Application Name      : %s\n", c.ApplicationName)
+	fmt.Printf("  App Version           : %s\n", c.ApplicationVersion)
 
 	latestRelease, err := client.Releases.GetLatestRelease()
 	if err != nil {

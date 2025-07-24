@@ -81,28 +81,27 @@ func deriveOpenShiftEnv(ctx ci.Context) string {
 	}
 }
 
-// generateBuildTags returns Docker image tags for this build, based on CI context.
-// Ensures consistent tagging patterns across RCs, features, and stable branches.
 func generateBuildTags(ctx ci.Context, env, appName, sha string) []string {
-	// For dev merge requests, treat as release candidates
-	if ctx.IsMergeRequest && ctx.MergeRequestTargetBranch == "dev" {
-		base := fmt.Sprintf("%s/%s", ctx.RegistryImage, appName)
-		return []string{
-			fmt.Sprintf("%s:rc-%s", base, sha), // immutable tag (e.g. rc-a1b2c3d)
-			fmt.Sprintf("%s:rc-latest", base),  // floating tag (e.g. rc-latest)
-		}
-	}
-
-	// Feature branches go under /env/app/branch:sha
 	base := fmt.Sprintf("%s/%s/%s", ctx.RegistryImage, env, appName)
+
+	// Feature branches
 	if ctx.IsFeatureBranch {
 		return []string{
 			fmt.Sprintf("%s/%s:%s", base, ctx.RefName, sha),
 		}
 	}
 
-	// Default tagging for non-feature environments
-	return []string{
+	tags := []string{
 		fmt.Sprintf("%s:%s", base, sha),
 	}
+
+	if ctx.ApplicationVersion != "" {
+		tags = append(tags, fmt.Sprintf("%s:%s", base, ctx.ApplicationVersion))
+	}
+
+	if env == "prod" {
+		tags = append(tags, fmt.Sprintf("%s:latest", base))
+	}
+
+	return tags
 }

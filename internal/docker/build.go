@@ -18,7 +18,11 @@ func BuildImage(opts *BuildOptions) error {
 	}
 
 	// Add custom Dockerfile if specified
-	args = append(args, "-f", opts.Dockerfile)
+	dockerfile := opts.Dockerfile
+	if dockerfile == "" {
+		dockerfile = "Dockerfile"
+	}
+	args = append(args, "-f", dockerfile)
 
 	// Include all provided --build-arg key=value flags
 	for _, arg := range opts.ExtraBuildArgs {
@@ -26,15 +30,20 @@ func BuildImage(opts *BuildOptions) error {
 	}
 
 	// Add build context (usually ".")
-	args = append(args, opts.ContextPath)
+	context := opts.ContextPath
+	if context == "" {
+		context = "."
+	}
+	args = append(args, context)
 
 	// Support dry-run execution (no actual build)
 	if opts.DryRun {
+		fmt.Println("DRY RUN: docker", args)
 		executil.DryRunCMD("docker", args...)
 		return nil
 	}
 
 	// Print image tags being built for visibility
-	fmt.Printf("Building images: %v\n", opts.FullImages)
+	fmt.Printf("Building Docker images: %v\n", opts.FullImages)
 	return executil.RunCMD("docker", args...)
 }
