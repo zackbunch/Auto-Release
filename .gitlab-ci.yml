@@ -8,6 +8,7 @@ variables:
   APP_NAME: syaccli
   GIT_DEPTH: 0
   SPRINT: 120
+  SYAC_IMAGE: alpine:latest
 
 
 stages:
@@ -63,3 +64,38 @@ build_dev:
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
     - when: never
+
+
+release_dev:
+  stage: release
+  extends: .build-dind
+  image: $SYAC_IMAGE
+  variables:
+    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev/$APP_NAME"
+    PUSH_IMAGE: "false"
+    PUSH_LATEST: "false"
+  dependencies:
+    - build_binary
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
+      when: on_success
+  script:
+    - chmod +x ./syac
+
+    - VERSION=$(./syac release infer-bump | tail -n1)
+    - echo "Computed release version $VERSION"
+    - echo "VERSION=$VERSION" >> version.env
+
+    - if [ -z "$VERSION" ]; then echo "Failed to infer version"; exit 1; fi
+
+    - ./syac release create --ref "$CI_COMMIT_SHA" --description "Version $VERSION Release - Sprint $SPRINT"
+
+    - docker pull "$IMAGE_ENV_PATH:$SHORT_SHA"
+
+    - for tag in "$VERSION" "$CI_COMMIT_SHORT_SHA"; do
+        docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$tag"
+        docker push "$IMAGE_ENV_PATH:$tag"
+      done
+  artifacts:
+    reports:
+      dotenv: version.env
