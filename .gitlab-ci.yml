@@ -6,10 +6,6 @@ include:
 variables:
   SHORT_SHA: $CI_COMMIT_SHORT_SHA
   APP_NAME: syaccli
-  GIT_DEPTH: 0
-  SPRINT: 120
-  SYAC_IMAGE: docker:24.0.5
-
 
 stages:
   - setup      # compile + comment logic
@@ -22,6 +18,8 @@ stages:
 build_binary:
   stage: setup
   image: golang:1.24
+  variables:
+    SYAC_APPLICATION_NAME: syaccli
   script:
     - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
   after_script:
@@ -31,93 +29,29 @@ build_binary:
     paths:
       - syac
     expire_in: 1 hour
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
-      when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
-      when: on_success
 
-# ------------------------------------------------
-# MR Validation
-# ------------------------------------------------
-validate_mr:
-  stage: setup
-  image: $SYAC_IMAGE
-  needs:
-    - build_binary
-  dependencies:
-    - build_binary
-  script:
-    - chmod +x ./syac
-    - echo "Validating MR context"
-    - ./syac update-mr
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
-
-# ------------------------------------------------
-# Feature Branch Build
-# ------------------------------------------------
+# -----------------------------------------------
+# Build on feature branches — gmarm-* (no push) 
+# -----------------------------------------------
 build_feature:
   stage: build
   extends: [.build-dind, .build-common]
-  image: $SYAC_IMAGE
   variables:
     IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/feature/$CI_COMMIT_REF_NAME"
     PUSH_IMAGE: "false"
-  dependencies:
-    - build_binary
-  script:
-    - chmod +x ./syac
-    - ./syac context
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
-      when: on_success
+    - if: '$CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
 
-
-# ------------------------------------------------
-# Dev Branch Build
-# ------------------------------------------------
+# -----------------------------------------------
+# Build on dev — push SHA + latest
+# -----------------------------------------------
 build_dev:
   stage: build
-  image: $SYAC_IMAGE
   extends: [.build-dind, .build-common]
   variables:
-    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev/$APP_NAME"
+    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
     PUSH_IMAGE: "true"
-    PUSH_LATEST: "false"
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
-
-
-release_dev:
-  stage: release
-  extends: .build-dind
-  image: $SYAC_IMAGE
-  variables:
-    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev/$APP_NAME"
-    PUSH_IMAGE: "false"
-    PUSH_LATEST: "false"
-  dependencies:
-    - build_binary
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
-      when: on_success
-  script:
-    - chmod +x ./syac
-    - VERSION=$(./syac release infer-bump | tail -n1)
-    - echo "Computed release version $VERSION"
-    - echo "VERSION=$VERSION" >> version.env
-
-    - ./syac release create --ref "$CI_COMMIT_SHA" --description "Version $VERSION Release - Sprint $SPRINT"
-
-    - docker pull "$IMAGE_ENV_PATH:$SHORT_SHA"
-    - docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$VERSION"
-    - docker push "$IMAGE_ENV_PATH:$VERSION"
-
-    - docker tag "$IMAGE_ENV_PATH:$SHORT_SHA" "$IMAGE_ENV_PATH:$CI_COMMIT_SHORT_SHA"
-    - docker push "$IMAGE_ENV_PATH:$CI_COMMIT_SHORT_SHA"
-  artifacts:
-    reports:
-      dotenv: version.env
+    - when: never
