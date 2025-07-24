@@ -22,8 +22,6 @@ stages:
 build_binary:
   stage: setup
   image: golang:1.24
-  variables:
-    SYAC_APPLICATION_NAME: syaccli
   script:
     - CGO_ENABLED=0 go build -o syac -ldflags '-extldflags "-static"' .
   after_script:
@@ -35,6 +33,22 @@ build_binary:
     expire_in: 1 hour
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^gmarm-\d+$/'
+      when: on_success
+
+# ------------------------------------------------
+# MR Validation
+# ------------------------------------------------
+validate_mr:
+  stage: setup
+  image: $SYAC_IMAGE
+  dependencies:
+    - build_binary
+  script:
+    - chmod +x ./syac
+    - echo "Validating MR context"
+    - ./syac update-mr
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
 
 # ------------------------------------------------
@@ -60,7 +74,7 @@ build_feature:
 # -----------------------------------------------
 # Build on dev — push SHA + latest
 # -----------------------------------------------
-build_dev:
+build_and_dev:
   stage: build
   extends: [.build-dind, .build-common]
   variables:
