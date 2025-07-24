@@ -73,19 +73,20 @@ build_feature:
       when: on_success
 
 
-# -----------------------------------------------
-# Build on dev — push SHA + latest
-# -----------------------------------------------
-build_and_dev:
+# ------------------------------------------------
+# Dev Branch Build
+# ------------------------------------------------
+build_dev:
   stage: build
+  image: $SYAC_IMAGE
   extends: [.build-dind, .build-common]
   variables:
-    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev"
+    IMAGE_ENV_PATH: "$CI_REGISTRY_IMAGE/dev/$APP_NAME"
     PUSH_IMAGE: "true"
+    PUSH_LATEST: "false"
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
-    - when: never
 
 
 release_dev:
